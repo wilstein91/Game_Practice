@@ -160,10 +160,15 @@
   var cur = null, stepIdx = 0, nextTime = 0, pending = null;
   var tempoMul = 1;
   var paused = false;
-  var VOLUME = 0.3;
 
-  var muted = false;
-  try { muted = global.localStorage.getItem('snake.muted') === '1'; } catch (e) {}
+  // 배경음악 음량: 0 = Mute, 1 ~ 3 단계
+  var LEVELS = [0, 0.14, 0.26, 0.40];
+  var level = 2;
+  try {
+    var stored = global.localStorage.getItem('snake.bgm');
+    if (stored !== null) level = Math.max(0, Math.min(3, parseInt(stored, 10) || 0));
+    else if (global.localStorage.getItem('snake.muted') === '1') level = 0;   // 예전 설정 이관
+  } catch (e) {}
 
   function makeNoise() {
     var len = Math.floor(ctx.sampleRate * 0.4);
@@ -180,7 +185,7 @@
       if (!AC) return false;
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = muted ? 0 : VOLUME;
+      master.gain.value = LEVELS[level];
       master.connect(ctx.destination);
       noiseBuf = makeNoise();
       global.setInterval(schedule, 25);
@@ -301,7 +306,7 @@
   }
 
   function sfx(name) {
-    if (!ctx || muted || paused) return;
+    if (!ctx || level === 0 || paused) return;
     var t = ctx.currentTime + 0.001;
 
     if (name === 'eat') {
@@ -317,14 +322,18 @@
 
   function applyGain(ramp) {
     if (!master) return;
-    master.gain.setTargetAtTime((muted || paused) ? 0 : VOLUME, ctx.currentTime, ramp);
+    master.gain.setTargetAtTime(paused ? 0 : LEVELS[level], ctx.currentTime, ramp);
   }
 
-  function setMuted(v) {
-    muted = !!v;
+  function setLevel(n) {
+    level = Math.max(0, Math.min(LEVELS.length - 1, n | 0));
     applyGain(0.02);
-    try { global.localStorage.setItem('snake.muted', muted ? '1' : '0'); } catch (e) {}
+    try { global.localStorage.setItem('snake.bgm', String(level)); } catch (e) {}
+    return level;
   }
+
+  // Mute -> 1 -> 2 -> 3 -> Mute
+  function cycleLevel() { return setLevel((level + 1) % LEVELS.length); }
 
   // 일시정지: 재생 위치를 유지한 채 스케줄러만 멈춘다.
   function setPaused(v) {
@@ -343,9 +352,11 @@
     sfx: sfx,
     setIntensity: setIntensity,
     tempo: function () { return { mul: tempoMul, bpm: cur ? Math.round(cur.bpm * (cur.dynamic ? tempoMul : 1)) : null }; },
-    isMuted: function () { return muted; },
-    setMuted: setMuted,
-    setPaused: setPaused,
-    toggleMute: function () { setMuted(!muted); return muted; }
+    isMuted: function () { return level === 0; },
+    level: function () { return level; },
+    maxLevel: LEVELS.length - 1,
+    setLevel: setLevel,
+    cycleLevel: cycleLevel,
+    setPaused: setPaused
   };
 })(window);

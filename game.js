@@ -79,8 +79,8 @@
     {
       id: 'ball', ko: '볼파이톤', sci: 'Python regius', price: 700,
       pattern: 'ballblotch',
-      base: '#3b2c1a', line: '#150e06', mark: '#c9a24a',
-      head: '#48361f', eye: '#c08a3e', pupil: 'slit',
+      base: '#4a3720', line: '#170f06', mark: '#d4ac52',
+      head: '#57411f', eye: '#c08a3e', pupil: 'slit',
       girth: 1.14, headShape: 'blunt', markStep: 2,
       note: '굵고 짧은 몸에 황금빛 얼룩이 좌우로 번갈아 물린다.'
     },
@@ -150,7 +150,6 @@
   var retryBtn = document.getElementById('retryBtn');
   var homeBtn = document.getElementById('homeBtn');
   var muteBtn = document.getElementById('muteBtn');
-  var muteIcon = document.getElementById('muteIcon');
   var hiScoreEl = document.getElementById('hiScore');
   var miceEl = document.getElementById('silverSlot');
   var toWinEl = document.getElementById('toWin');
@@ -218,34 +217,62 @@
     c.width = W; c.height = H;
     var g = c.getContext('2d');
 
+    // 마른 흙밭 — 뱀 스킨(검정·빨강·황금·올리브·황갈)과 흰 쥐가 모두 뜨도록
+    // 채도를 낮추고 충분히 어둡게 깐다.
     var grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#28331f');
-    grad.addColorStop(0.55, '#1e2a1c');
-    grad.addColorStop(1, '#151f16');
+    grad.addColorStop(0, '#3a2f26');
+    grad.addColorStop(0.55, '#2e251e');
+    grad.addColorStop(1, '#241d18');
     g.fillStyle = grad;
     g.fillRect(0, 0, W, H);
 
-    for (var j = 0; j < 90; j++) {
-      g.fillStyle = (j % 3 === 0) ? 'rgba(88,116,62,0.10)' : 'rgba(52,40,26,0.12)';
+    // 흙이 뭉친 자국
+    for (var j = 0; j < 110; j++) {
+      g.fillStyle = (j % 2) ? 'rgba(92,74,56,0.13)' : 'rgba(28,22,17,0.16)';
       g.beginPath();
       g.ellipse(Math.random() * W, Math.random() * H,
-                Math.random() * 40 + 14, Math.random() * 24 + 9,
+                Math.random() * 46 + 16, Math.random() * 26 + 10,
                 Math.random() * 3, 0, Math.PI * 2);
       g.fill();
     }
 
-    var speck = ['rgba(112,134,86,0.13)', 'rgba(62,46,30,0.18)',
-                 'rgba(146,160,116,0.09)', 'rgba(30,42,28,0.20)'];
-    for (var i = 0; i < 1600; i++) {
-      g.fillStyle = speck[i & 3];
+    // 갈라진 골
+    g.lineCap = 'round';
+    for (var k = 0; k < 26; k++) {
+      var x = Math.random() * W, y = Math.random() * H;
+      g.strokeStyle = 'rgba(24,18,14,0.30)';
+      g.lineWidth = Math.random() * 1.8 + 0.6;
       g.beginPath();
-      g.arc(Math.random() * W, Math.random() * H, Math.random() * 2.4 + 0.4, 0, Math.PI * 2);
-      g.fill();
+      g.moveTo(x, y);
+      for (var seg = 0; seg < 4; seg++) {
+        x += (Math.random() - 0.5) * 70;
+        y += (Math.random() - 0.5) * 40;
+        g.lineTo(x, y);
+      }
+      g.stroke();
     }
 
-    var vg = g.createRadialGradient(W / 2, H / 2, H * 0.24, W / 2, H / 2, H * 0.92);
+    // 모래 알갱이와 잔돌
+    var speck = ['rgba(146,120,92,0.16)', 'rgba(38,29,22,0.24)',
+                 'rgba(178,152,118,0.10)', 'rgba(60,47,36,0.20)'];
+    for (var i = 0; i < 2000; i++) {
+      g.fillStyle = speck[i & 3];
+      g.beginPath();
+      g.arc(Math.random() * W, Math.random() * H, Math.random() * 2.2 + 0.4, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (var s2 = 0; s2 < 90; s2++) {
+      var px = Math.random() * W, py = Math.random() * H, pr = Math.random() * 2.6 + 1.4;
+      g.fillStyle = 'rgba(120,108,92,0.22)';
+      g.beginPath(); g.arc(px, py, pr, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(20,15,11,0.30)';
+      g.beginPath(); g.arc(px + pr * 0.35, py + pr * 0.45, pr * 0.8, 0, Math.PI * 2); g.fill();
+    }
+
+    // 가장자리 그늘
+    var vg = g.createRadialGradient(W / 2, H / 2, H * 0.26, W / 2, H / 2, H * 0.95);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.46)');
     g.fillStyle = vg;
     g.fillRect(0, 0, W, H);
 
@@ -341,10 +368,10 @@
     // 활짝 펼친 후드 (킹코브라) — 머리 뒤로 넓게 벌어지는 방패꼴
     if (sk.hood) {
       g.beginPath();
-      g.moveTo(L * 0.12, -B * 0.44);
-      g.bezierCurveTo(-L * 0.18, -B * 1.85, -L * 1.05, -B * 1.60, -L * 1.22, -B * 0.38);
-      g.quadraticCurveTo(-L * 1.30, 0, -L * 1.22, B * 0.38);
-      g.bezierCurveTo(-L * 1.05, B * 1.60, -L * 0.18, B * 1.85, L * 0.12, B * 0.44);
+      g.moveTo(L * 0.10, -B * 0.42);
+      g.bezierCurveTo(-L * 0.28, -B * 1.02, -L * 0.90, -B * 0.98, -L * 1.55, -B * 0.34);
+      g.quadraticCurveTo(-L * 1.66, 0, -L * 1.55, B * 0.34);
+      g.bezierCurveTo(-L * 0.90, B * 0.98, -L * 0.28, B * 1.02, L * 0.10, B * 0.42);
       g.closePath();
       g.fillStyle = sk.head;
       g.fill();
@@ -354,13 +381,13 @@
 
       // 킹코브라 특유의 갈매기 무늬 (스펙터클이 아니다)
       g.strokeStyle = sk.hoodMark;
-      g.lineWidth = Math.max(1.8, bw * 0.20);
+      g.lineWidth = Math.max(1.6, bw * 0.15);
       g.lineCap = 'round';
       g.lineJoin = 'round';
       g.beginPath();
-      g.moveTo(-L * 1.00, -B * 0.95);
-      g.lineTo(-L * 0.52, 0);
-      g.lineTo(-L * 1.00, B * 0.95);
+      g.moveTo(-L * 1.18, -B * 0.52);
+      g.lineTo(-L * 0.72, 0);
+      g.lineTo(-L * 1.18, B * 0.52);
       g.stroke();
     }
 
@@ -439,14 +466,31 @@
     }
 
     if (n > 1) {
+      // 0) 바닥에 지는 그림자 — 흙바닥에서 몸이 확실히 떠 보이게 한다
+      g.save();
+      g.translate(2, 3);
+      pathTo(end);
+      g.strokeStyle = 'rgba(0,0,0,0.38)';
+      g.lineWidth = bw + 7;
+      g.stroke();
+      g.restore();
+
       // 1) 외곽선
       pathTo(end);
       g.strokeStyle = sk.line;
       g.lineWidth = bw + 5;
       g.stroke();
 
-      // 2) 몸통 — 띠 무늬는 색깔별로 묶어 한 번씩 칠한다
+      // 2) 몸통 — 띠 무늬는 색깔별로 묶어 한 번씩 칠한다.
+      //    코너가 비지 않도록 바탕 관을 먼저 깔고, 띠는 butt 캡으로 얹어
+      //    끝이 둥근 캡슐이 아니라 각진 사각 띠로 보이게 한다.
       if (sk.bands) {
+        pathTo(end);
+        g.strokeStyle = sk.base;
+        g.lineWidth = bw;
+        g.stroke();
+
+        g.lineCap = 'butt';
         var groups = {};
         for (i = 0; i + 1 < end; i++) {
           var c = bodyColor(sk, seqAt(i));
@@ -464,6 +508,7 @@
           g.lineWidth = bw;
           g.stroke();
         }
+        g.lineCap = 'round';
       } else {
         pathTo(end);
         g.strokeStyle = sk.base;
@@ -752,7 +797,7 @@
   function drawBg() {
     ctx.drawImage(ground, 0, 0);
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.032)';
+    ctx.strokeStyle = 'rgba(255,236,205,0.030)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (var x = 1; x < COLS; x++) { ctx.moveTo(x * TILE + 0.5, 0); ctx.lineTo(x * TILE + 0.5, H); }
@@ -1044,7 +1089,7 @@
 
       drawKeys(W / 2, H * 0.675, [
         { key: 'ESC' }, { text: '  일시정지' }, { text: '  ' },
-        { key: 'M' }, { text: '  배경음악 On / Off' }
+        { key: 'M' }, { text: '  배경음악 음량 (Mute · 1 · 2 · 3)' }
       ], 19);
 
     } else {
@@ -1097,11 +1142,11 @@
     var w = cv.width, h = cv.height;
     g.clearRect(0, 0, w, h);
 
-    // 세그먼트 간격 / 몸통 굵기 비율을 인게임(32px / 21.8px)과 맞춰야
-    // 띠 무늬가 실제 플레이 화면과 같은 굵기로 보인다.
-    var bw = h * 0.24 * (skin.girth || 1);
-    var span = w * 0.74;
-    var N = Math.max(8, Math.round(span / (bw * 1.47))) + 1;
+    // 카드 안에서 보기 좋은 비율 (인게임 실제 크기를 따르지는 않는다).
+    // 띠 폭 / 몸통 굵기 비율만 인게임과 비슷하게 유지한다.
+    var bw = h * 0.30 * (skin.girth || 1);
+    var span = w * 0.76;
+    var N = Math.max(7, Math.round(span / (bw * 1.35))) + 1;
 
     var pts = [];
     for (var i = 0; i < N; i++) {
@@ -1126,23 +1171,13 @@
 
       var cv = document.createElement('canvas');
       cv.className = 'skinPreview';
-      cv.width = 380; cv.height = 68;
+      cv.width = 300; cv.height = 60;
       card.appendChild(cv);
 
       var name = document.createElement('div');
       name.className = 'skinName';
       name.textContent = sk.ko;
       card.appendChild(name);
-
-      var sci = document.createElement('div');
-      sci.className = 'skinSci';
-      sci.textContent = sk.sci;
-      card.appendChild(sci);
-
-      var note = document.createElement('div');
-      note.className = 'skinNote';
-      note.textContent = sk.note;
-      card.appendChild(note);
 
       var foot = document.createElement('div');
       foot.className = 'skinFoot';
@@ -1228,15 +1263,18 @@
     hideHint();
   }
 
-  function syncMuteUi() {
-    var m = Chip.isMuted();
-    muteIcon.textContent = m ? '🔇' : '🔊';
-    muteBtn.classList.toggle('off', m);
+  var BGM_ICON = ['🔇', '🔈', '🔉', '🔊'];
+
+  function syncBgmUi() {
+    var lv = Chip.level();
+    muteBtn.textContent = BGM_ICON[lv] + ' BGM ' + (lv === 0 ? 'Mute' : lv);
+    muteBtn.classList.toggle('off', lv === 0);
   }
 
-  function toggleMute() {
-    Chip.toggleMute();
-    syncMuteUi();
+  // Mute -> 1 -> 2 -> 3 -> Mute
+  function cycleBgm() {
+    Chip.cycleLevel();
+    syncBgmUi();
   }
 
   // 디버그: 승리 화면 검증용
@@ -1267,7 +1305,7 @@
       return;
     }
 
-    if (e.key === 'm' || e.key === 'M' || e.key === 'ㅡ') { toggleMute(); return; }
+    if (e.key === 'm' || e.key === 'M' || e.key === 'ㅡ') { cycleBgm(); return; }
     if (shopOpen) return;
 
     if (state === 'playing' && e.shiftKey) {
@@ -1299,7 +1337,7 @@
   shopCloseBtn.addEventListener('click', function () { wake(); closeShop(); });
   retryBtn.addEventListener('click', function () { wake(); goTitle(); });
   homeBtn.addEventListener('click', function () { wake(); goTitle(); });
-  muteBtn.addEventListener('click', function () { wake(); toggleMute(); });
+  muteBtn.addEventListener('click', function () { wake(); cycleBgm(); });
 
   /* ------------------------------------------------------------- 기동 */
 
@@ -1342,7 +1380,7 @@
   };
 
   ground = buildGround();
-  syncMuteUi();
+  syncBgmUi();
   goTitle();
   requestAnimationFrame(frame);
 })();
