@@ -1,8 +1,8 @@
 /*
  * game.js — SNAKE
  *
- * 32 x 18 그리드, 시작 길이 5, 길이 300 달성 시 승리.
- * 먹이를 먹을 때마다 틱 간격이 3.2ms씩 줄어들어 후반으로 갈수록 급격히 빨라진다.
+ * 32 x 18 그리드, 시작 길이 5, 길이 355 달성 시 승리.
+ * 속도는 1.4칸/초에서 시작해 먹이 하나당 균일한 폭으로 올라 355칸에서 18칸/초에 도달한다.
  */
 (function () {
   'use strict';
@@ -13,15 +13,16 @@
   var W = COLS * TILE, H = ROWS * TILE;
 
   var START_LEN = 5;
-  var WIN_LEN = 300;
+  var WIN_LEN = 355;
 
-  var START_MS = 1000;   // 시작 틱 간격 (1칸/초)
-  var MIN_MS = 55;       // 하한 (약 18칸/초)
-  var STEP_MS = 3.2;     // 한 칸 자랄 때마다 줄어드는 간격
+  var MIN_SPEED = 1.4;    // 시작 속도 (칸/초)
+  var MAX_SPEED = 18;     // 승리 길이에서 도달하는 최고 속도 (칸/초)
 
   var COUNTDOWN = ['3', '2', '1', 'Go!'];
   var COUNT_MS = 700;
   var WANDER_MS = 140;
+
+  var FONT = '"Trebuchet MS", "Malgun Gothic", "Segoe UI", sans-serif';
 
   var DIRS = {
     up:    { x:  0, y: -1 },
@@ -51,11 +52,14 @@
   var retryBtn = document.getElementById('retryBtn');
   var homeBtn = document.getElementById('homeBtn');
   var muteBtn = document.getElementById('muteBtn');
+  var muteIcon = document.getElementById('muteIcon');
+  var hiScoreEl = document.getElementById('hiScore');
+  var toWinEl = document.getElementById('toWin');
   var hint = document.getElementById('hint');
 
   /* ------------------------------------------------------------- 상태 */
 
-  var state = 'title';          // title | countdown | playing | win | lose
+  var state = 'title';          // title | countdown | playing | paused | win | lose
   var snake, dir, queue, food;
   var moveMs, moveAcc;
   var countdownIdx, countdownAcc;
@@ -63,12 +67,37 @@
   var flash = 0;
   var now = 0, lastTs = 0;
 
-  function intervalFor(len) {
-    return Math.max(MIN_MS, START_MS - (len - START_LEN) * STEP_MS);
+  var hiScore = 0;
+  try { hiScore = parseInt(window.localStorage.getItem('snake.hiscore'), 10) || 0; } catch (e) {}
+
+  /* --------------------------------------------------------- 속도 곡선 */
+
+  // 먹이 하나당 (MAX_SPEED - MIN_SPEED) / (WIN_LEN - START_LEN) 만큼 균일하게 빨라진다.
+  function speedFor(len) {
+    var t = (len - START_LEN) / (WIN_LEN - START_LEN);
+    t = Math.max(0, Math.min(1, t));
+    return MIN_SPEED + (MAX_SPEED - MIN_SPEED) * t;
   }
 
-  function intensityFor(ms) {
-    return 1 - (ms - MIN_MS) / (START_MS - MIN_MS);
+  function intervalFor(len) { return 1000 / speedFor(len); }
+
+  function intensityFor(len) {
+    return (speedFor(len) - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+  }
+
+  /* ------------------------------------------------------------- HUD */
+
+  function renderHud() {
+    hiScoreEl.innerHTML = 'HI-SCORE <b>' + hiScore + '</b>';
+    var len = (state === 'title' || !snake) ? START_LEN : snake.length;
+    toWinEl.innerHTML = '승리까지 <b>' + Math.max(0, WIN_LEN - len) + '</b>';
+  }
+
+  function recordScore() {
+    if (snake && snake.length > hiScore) {
+      hiScore = snake.length;
+      try { window.localStorage.setItem('snake.hiscore', String(hiScore)); } catch (e) {}
+    }
   }
 
   /* --------------------------------------------------- 타이틀 배경 뱀 */
@@ -134,7 +163,10 @@
       }
     }
     if (!free.length) return null;
-    return free[Math.floor(Math.random() * free.length)];
+
+    var cell = free[Math.floor(Math.random() * free.length)];
+    cell.face = Math.random() < 0.5 ? -1 : 1;   // 쥐가 바라보는 방향
+    return cell;
   }
 
   function stepGame() {
@@ -155,6 +187,7 @@
     if (food && nx === food.x && ny === food.y) {
       flash = 1;
       Chip.sfx('eat');
+      renderHud();
       if (snake.length >= WIN_LEN) { win(); return; }
       food = spawnFood();
     } else {
@@ -162,7 +195,7 @@
     }
 
     moveMs = intervalFor(snake.length);
-    Chip.setIntensity(intensityFor(moveMs));
+    Chip.setIntensity(intensityFor(snake.length));
   }
 
   /* ------------------------------------------------------- 화면 전환 */
@@ -172,11 +205,14 @@
     startBtn.classList.toggle('hidden', s !== 'title');
     retryBtn.classList.toggle('hidden', s !== 'lose');
     homeBtn.classList.toggle('hidden', s !== 'win');
+    renderHud();
   }
 
   function goTitle() {
     wander = newWanderer();
     wanderAcc = 0;
+    snake = null;
+    Chip.setPaused(false);
     setState('title');
     Chip.play('title');
   }
@@ -185,17 +221,33 @@
     resetGame();
     countdownIdx = 0;
     countdownAcc = 0;
-    setState('countdown');
+    Chip.setPaused(false);
     Chip.setIntensity(0);
+    setState('countdown');
     Chip.play('game');
   }
 
+  function togglePause() {
+    if (state === 'playing') {
+      Chip.setPaused(true);
+      setState('paused');
+    } else if (state === 'paused') {
+      Chip.setPaused(false);
+      moveAcc = 0;
+      setState('playing');
+    }
+  }
+
   function win() {
+    recordScore();
+    Chip.setPaused(false);
     setState('win');
     Chip.play('win');
   }
 
   function lose() {
+    recordScore();
+    Chip.setPaused(false);
     setState('lose');
     Chip.play('lose');
   }
@@ -313,26 +365,64 @@
     ctx.restore();
   }
 
-  function drawFood(f) {
-    if (!f) return;
-    var cx = f.x * TILE + TILE / 2, cy = f.y * TILE + TILE / 2;
-    var r = TILE * 0.30 + Math.sin(now / 220) * 1.8;
+  /* ------------------------------------------------------- 먹이: 쥐 */
+
+  function drawMouse(f) {
+    var s = TILE;
+    var cx = f.x * s + s / 2;
+    var cy = f.y * s + s / 2 + Math.sin(now / 320) * 0.9;   // 살짝 들썩이는 숨결
+    var face = f.face || 1;
 
     ctx.save();
-    ctx.shadowColor = 'rgba(255,59,92,0.9)';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = '#ff3b5c';
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(cx, cy);
+    ctx.scale(face, 1);
+    ctx.shadowColor = 'rgba(255,170,190,0.55)';
+    ctx.shadowBlur = 12;
 
+    // 꼬리
+    ctx.strokeStyle = '#e79cae';
+    ctx.lineWidth = s * 0.055;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.24, s * 0.10);
+    ctx.quadraticCurveTo(-s * 0.48, s * 0.14, -s * 0.44, -s * 0.10);
+    ctx.stroke();
+
+    // 귀
+    ctx.fillStyle = '#c9d1dd';
+    ctx.beginPath(); ctx.arc(s * 0.06, -s * 0.17, s * 0.115, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.beginPath(); ctx.arc(cx - r * 0.32, cy - r * 0.36, r * 0.28, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff9fb2';
+    ctx.beginPath(); ctx.arc(s * 0.07, -s * 0.16, s * 0.058, 0, Math.PI * 2); ctx.fill();
+
+    // 몸통 + 머리
+    ctx.shadowColor = 'rgba(255,170,190,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#dfe5ee';
+    ctx.beginPath(); ctx.ellipse(-s * 0.04, s * 0.045, s * 0.235, s * 0.175, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s * 0.19, s * 0.055, s * 0.155, s * 0.135, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 눈 · 코
+    ctx.fillStyle = '#161b22';
+    ctx.beginPath(); ctx.arc(s * 0.20, s * 0.015, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff6f8b';
+    ctx.beginPath(); ctx.arc(s * 0.335, s * 0.085, s * 0.033, 0, Math.PI * 2); ctx.fill();
+
+    // 수염
+    ctx.strokeStyle = 'rgba(255,240,245,0.85)';
+    ctx.lineWidth = Math.max(1, s * 0.02);
+    ctx.beginPath();
+    ctx.moveTo(s * 0.34, s * 0.07); ctx.lineTo(s * 0.49, s * 0.005);
+    ctx.moveTo(s * 0.34, s * 0.11); ctx.lineTo(s * 0.50, s * 0.16);
+    ctx.stroke();
+
     ctx.restore();
   }
 
   function text(str, x, y, size, color, glowColor) {
     ctx.save();
-    ctx.font = 'bold ' + size + 'px "Trebuchet MS", "Segoe UI", sans-serif';
+    ctx.font = 'bold ' + size + 'px ' + FONT;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (glowColor !== 'none') {
@@ -341,6 +431,53 @@
     }
     ctx.fillStyle = color;
     ctx.fillText(str, x, y);
+    ctx.restore();
+  }
+
+  /* -------------------------------------------- 조작법 안내 (키 배지) */
+
+  function tokenFont(tk, size) {
+    ctx.font = (tk.key ? 'bold ' : '') + size + 'px ' + FONT;
+  }
+
+  function drawKeys(cxp, y, tokens, size) {
+    var padX = size * 0.5, badgeH = size * 1.62, gap = size * 0.3;
+
+    ctx.save();
+    ctx.textBaseline = 'middle';
+
+    var widths = [], total = 0, i, w;
+    for (i = 0; i < tokens.length; i++) {
+      tokenFont(tokens[i], size);
+      w = tokens[i].key
+        ? Math.max(badgeH * 0.95, ctx.measureText(tokens[i].key).width + padX * 2)
+        : ctx.measureText(tokens[i].text).width;
+      widths.push(w);
+      total += w + (i ? gap : 0);
+    }
+
+    var x = cxp - total / 2;
+    ctx.textAlign = 'center';
+
+    for (i = 0; i < tokens.length; i++) {
+      tokenFont(tokens[i], size);
+      w = widths[i];
+      if (tokens[i].key) {
+        ctx.fillStyle = 'rgba(57,255,136,0.10)';
+        ctx.strokeStyle = 'rgba(57,255,136,0.42)';
+        ctx.lineWidth = 1.5;
+        rrect(x, y - badgeH / 2, w, badgeH, size * 0.32);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(210,255,230,0.92)';
+        ctx.fillText(tokens[i].key, x + w / 2, y + 1);
+      } else {
+        ctx.fillStyle = 'rgba(200,255,225,0.55)';
+        ctx.fillText(tokens[i].text, x + w / 2, y + 1);
+      }
+      x += w + gap;
+    }
+
     ctx.restore();
   }
 
@@ -461,12 +598,21 @@
 
     if (state === 'title') {
       drawSnake(wander.cells, 0.30, wander.dir);
-      veil(0.5);
-      drawLogo(W / 2, H * 0.36, 30);
-      text('W A S D   ·   ← ↑ ↓ →', W / 2, H * 0.60, 20,
-           'rgba(200,255,225,0.55)', 'none');
+      veil(0.55);
+      drawLogo(W / 2, H * 0.30, 27);
+
+      drawKeys(W / 2, H * 0.565, [
+        { key: 'W' }, { key: 'A' }, { key: 'S' }, { key: 'D' }, { text: '/' },
+        { key: '←' }, { key: '↑' }, { key: '↓' }, { key: '→' }, { text: '  이동' }
+      ], 19);
+
+      drawKeys(W / 2, H * 0.675, [
+        { key: 'ESC' }, { text: '  일시정지' }, { text: '  ' },
+        { key: 'M' }, { text: '  배경음악 On / Off' }
+      ], 19);
+
     } else {
-      drawFood(food);
+      if (food) drawMouse(food);
       drawSnake(snake, 1, dir);
 
       if (state === 'countdown') {
@@ -475,17 +621,24 @@
         var p = countdownAcc / COUNT_MS;
         text(label, W / 2, H * 0.45, 150 - p * 28,
              label === 'Go!' ? '#b9ff5a' : '#e8fff3');
+
+      } else if (state === 'paused') {
+        veil(0.7);
+        text('PAUSED', W / 2, H * 0.42, 86, '#e8fff3');
+        drawKeys(W / 2, H * 0.58, [{ key: 'ESC' }, { text: '  를 눌러 계속' }], 22);
+
       } else if (state === 'win') {
         veil(0.72);
         text('You Win!', W / 2, H * 0.34, 96, '#b9ff5a');
         text('LENGTH ' + snake.length, W / 2, H * 0.48, 26,
              'rgba(200,255,225,0.75)', 'none');
+
       } else if (state === 'lose') {
         veil(0.72);
         text('Better Luck Next Time', W / 2, H * 0.34, 60, '#ff6b81',
              'rgba(255,59,92,0.75)');
-        text('LENGTH ' + snake.length, W / 2, H * 0.48, 26,
-             'rgba(255,205,215,0.75)', 'none');
+        text('LENGTH ' + snake.length + '   ·   승리까지 ' + Math.max(0, WIN_LEN - snake.length) + ' 남았습니다',
+             W / 2, H * 0.48, 24, 'rgba(255,205,215,0.75)', 'none');
       }
     }
 
@@ -506,9 +659,15 @@
     hideHint();
   }
 
+  function syncMuteUi() {
+    var m = Chip.isMuted();
+    muteIcon.textContent = m ? '🔇' : '🔊';
+    muteBtn.classList.toggle('off', m);
+  }
+
   function toggleMute() {
-    var m = Chip.toggleMute();
-    muteBtn.textContent = m ? '🔇' : '🔊';
+    Chip.toggleMute();
+    syncMuteUi();
   }
 
   // 디버그: 승리 화면 검증용
@@ -518,7 +677,8 @@
       snake.push({ x: tail.x, y: tail.y });
     }
     moveMs = intervalFor(snake.length);
-    Chip.setIntensity(intensityFor(moveMs));
+    Chip.setIntensity(intensityFor(snake.length));
+    renderHud();
   }
 
   function debugWin() {
@@ -529,6 +689,12 @@
 
   window.addEventListener('keydown', function (e) {
     wake();
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      togglePause();
+      return;
+    }
 
     if (e.key === 'm' || e.key === 'M' || e.key === 'ㅡ') { toggleMute(); return; }
 
@@ -563,7 +729,29 @@
 
   /* ------------------------------------------------------------- 기동 */
 
-  muteBtn.textContent = Chip.isMuted() ? '🔇' : '🔊';
+  // 콘솔에서 속도 곡선을 확인·검증하기 위한 훅
+  window.SNAKE = {
+    state: function () {
+      return {
+        state: state,
+        length: snake ? snake.length : 0,
+        intervalMs: snake ? Math.round(intervalFor(snake.length) * 10) / 10 : null,
+        cellsPerSec: snake ? Math.round(speedFor(snake.length) * 100) / 100 : null,
+        toWin: snake ? Math.max(0, WIN_LEN - snake.length) : WIN_LEN - START_LEN
+      };
+    },
+    curve: function (step) {
+      var rows = [];
+      for (var l = START_LEN; l <= WIN_LEN; l += (step || 50)) {
+        rows.push({ length: l,
+                    intervalMs: Math.round(intervalFor(l)),
+                    cellsPerSec: Math.round(speedFor(l) * 100) / 100 });
+      }
+      return rows;
+    }
+  };
+
+  syncMuteUi();
   goTitle();
   requestAnimationFrame(frame);
 })();

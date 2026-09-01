@@ -7,17 +7,27 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="stage">
-    <canvas id="game" width="1024" height="576"></canvas>
+  <div id="wrap">
 
-    <div id="overlay">
-      <button id="startBtn" class="btn">시작!</button>
-      <button id="retryBtn" class="btn hidden">한번더?</button>
-      <button id="homeBtn"  class="btn hidden">메인으로</button>
+    <div id="topbar">
+      <div class="slot" id="hiScore">HI-SCORE <b>0</b></div>
+      <div class="slot" id="toWin">승리까지 <b>350</b></div>
+      <button id="muteBtn" type="button" title="배경음악 켜기/끄기 (M)">
+        <span id="muteIcon">🔊</span> BGM
+      </button>
     </div>
 
-    <button id="muteBtn" type="button" title="음소거 토글 (M)">🔊</button>
-    <div id="hint">🔊 클릭하면 음악이 재생됩니다</div>
+    <div id="stage">
+      <canvas id="game" width="1024" height="576"></canvas>
+      <div id="overlay">
+        <button id="startBtn" class="btn">시작!</button>
+        <button id="retryBtn" class="btn hidden">한번더?</button>
+        <button id="homeBtn"  class="btn hidden">메인으로</button>
+      </div>
+    </div>
+
+    <div id="footer"><span id="hint">🔊 화면을 한 번 클릭하면 배경음악이 재생됩니다</span></div>
+
   </div>
 
   <script src="audio.js"></script>

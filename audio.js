@@ -159,6 +159,7 @@
   var ctx = null, master = null, noiseBuf = null;
   var cur = null, stepIdx = 0, nextTime = 0, pending = null;
   var tempoMul = 1;
+  var paused = false;
   var VOLUME = 0.3;
 
   var muted = false;
@@ -234,7 +235,7 @@
 
   // 미리보기 스케줄러: 25ms마다 깨어나 150ms 앞까지 음을 예약한다.
   function schedule() {
-    if (!cur || !ctx) return;
+    if (!cur || !ctx || paused) return;
     var horizon = ctx.currentTime + 0.15;
     var guard = 0;
     while (nextTime < horizon && guard++ < 300) {
@@ -283,7 +284,7 @@
   }
 
   function sfx(name) {
-    if (!ctx || muted) return;
+    if (!ctx || muted || paused) return;
     var t = ctx.currentTime + 0.001;
     if (name === 'eat') {
       tone('lead', t, freq('E5'), 0.055, 0.16);
@@ -291,10 +292,24 @@
     }
   }
 
+  function applyGain(ramp) {
+    if (!master) return;
+    master.gain.setTargetAtTime((muted || paused) ? 0 : VOLUME, ctx.currentTime, ramp);
+  }
+
   function setMuted(v) {
     muted = !!v;
-    if (master) master.gain.setTargetAtTime(muted ? 0 : VOLUME, ctx.currentTime, 0.02);
+    applyGain(0.02);
     try { global.localStorage.setItem('snake.muted', muted ? '1' : '0'); } catch (e) {}
+  }
+
+  // 일시정지: 재생 위치를 유지한 채 스케줄러만 멈춘다.
+  function setPaused(v) {
+    v = !!v;
+    if (v === paused) return;
+    paused = v;
+    applyGain(0.05);
+    if (!paused && ctx) nextTime = ctx.currentTime + 0.06;
   }
 
   global.Chip = {
@@ -306,6 +321,7 @@
     setIntensity: setIntensity,
     isMuted: function () { return muted; },
     setMuted: setMuted,
+    setPaused: setPaused,
     toggleMute: function () { setMuted(!muted); return muted; }
   };
 })(window);

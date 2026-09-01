@@ -3,6 +3,8 @@
   --neon:    #39ff88;
   --ink:     #e8fff3;
   --danger:  #ff3b5c;
+  --panel:   rgba(9, 24, 17, .72);
+  --edge:    rgba(57, 255, 136, .22);
 }
 
 * { box-sizing: border-box; }
@@ -11,19 +13,75 @@ html, body { height: 100%; }
 
 body {
   margin: 0;
-  padding: 16px;
+  padding: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 28%, #0d1520 0%, var(--bg) 72%);
-  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(circle at 50% 26%, #0d1520 0%, var(--bg) 72%);
+  font-family: "Trebuchet MS", "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
   color: var(--ink);
   overflow: hidden;
 }
 
+#wrap {
+  width: min(96vw, calc((100vh - 132px) * 16 / 9), 1024px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------- 상단 바 */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slot {
+  padding: 8px 14px;
+  font-size: clamp(11px, 1.25vw, 14px);
+  letter-spacing: .09em;
+  color: rgba(200, 255, 225, .62);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.slot b {
+  margin-left: 6px;
+  font-size: 1.22em;
+  font-weight: 700;
+  color: var(--neon);
+  text-shadow: 0 0 12px rgba(57, 255, 136, .55);
+}
+
+#toWin b { color: #ffd166; text-shadow: 0 0 12px rgba(255, 209, 102, .5); }
+
+#muteBtn {
+  margin-left: auto;
+  padding: 8px 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: clamp(11px, 1.25vw, 14px);
+  letter-spacing: .09em;
+  color: rgba(200, 255, 225, .78);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+#muteBtn:hover { background: rgba(14, 48, 30, .9); border-color: rgba(57, 255, 136, .6); color: var(--ink); }
+#muteBtn:focus-visible { outline: 2px solid var(--neon); outline-offset: 3px; }
+#muteBtn.off { color: rgba(200, 255, 225, .38); }
+
+/* ------------------------------------------------------------ 게임 화면 */
+
 #stage {
   position: relative;
-  width: min(96vw, calc((100vh - 32px) * 16 / 9), 1024px);
+  width: 100%;
   aspect-ratio: 16 / 9;
 }
 
@@ -46,14 +104,14 @@ canvas {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding-bottom: 8%;
+  padding-bottom: 6%;
   pointer-events: none;
 }
 
 .btn {
   pointer-events: auto;
   cursor: pointer;
-  font: 700 clamp(15px, 2.1vw, 25px)/1 "Trebuchet MS", "Segoe UI", sans-serif;
+  font: 700 clamp(15px, 2.1vw, 25px)/1 "Trebuchet MS", "Malgun Gothic", "Segoe UI", sans-serif;
   letter-spacing: .06em;
   color: #04160c;
   background: linear-gradient(180deg, #8affbc, #22c96f);
@@ -68,36 +126,17 @@ canvas {
 .btn:active { transform: translateY(4px); box-shadow: 0 0 18px rgba(57, 255, 136, .5), 0 2px 0 #0c6b3c; }
 .btn:focus-visible { outline: 3px solid #b9ff5a; outline-offset: 4px; }
 
-#muteBtn {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  width: 40px;
-  height: 40px;
-  cursor: pointer;
-  font-size: 19px;
-  line-height: 1;
-  color: var(--ink);
-  background: rgba(6, 20, 13, .6);
-  border: 1px solid rgba(57, 255, 136, .35);
-  border-radius: 10px;
-  transition: background .15s ease, border-color .15s ease;
-}
-#muteBtn:hover { background: rgba(12, 45, 28, .8); border-color: rgba(57, 255, 136, .7); }
+/* --------------------------------------------------------------- 하단 */
 
-#hint {
-  position: absolute;
-  left: 14px;
-  bottom: 12px;
-  padding: 6px 12px;
-  font-size: clamp(11px, 1.2vw, 14px);
-  color: rgba(200, 255, 225, .75);
-  background: rgba(6, 20, 13, .6);
-  border: 1px solid rgba(57, 255, 136, .25);
-  border-radius: 8px;
-  animation: pulse 1.8s ease-in-out infinite;
+#footer {
+  min-height: 20px;
+  text-align: center;
+  font-size: clamp(10px, 1.15vw, 13px);
+  color: rgba(200, 255, 225, .5);
 }
 
-@keyframes pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+#hint { animation: pulse 1.8s ease-in-out infinite; }
+
+@keyframes pulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
 
 .hidden { display: none !important; }
