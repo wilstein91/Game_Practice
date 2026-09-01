@@ -1065,13 +1065,25 @@
 
     if (!inBounds(nx, ny)) { lose(); return; }
 
-    for (var i = 0; i < snake.length; i++) {
+    var willEat = !!(food && nx === food.x && ny === food.y);
+
+    /*
+     * 꼬리는 이번 틱에 그 칸을 비운다. 머리가 들어가는 것과 동시에 벌어지는
+     * 일이므로 충돌이 아니다. 쥐를 먹어 몸이 자라는 틱에만 꼬리가 제자리에
+     * 남으므로, 그때만 검사 범위에 넣는다.
+     *
+     * 쥐는 뱀이 점유하지 않은 칸에서만 생기니 꼬리 칸에 쥐가 놓이는 일은
+     * 없다. 즉 willEat과 '머리가 꼬리 칸으로'는 동시에 성립하지 않는다.
+     */
+    var checkLen = willEat ? snake.length : snake.length - 1;
+
+    for (var i = 0; i < checkLen; i++) {
       if (snake[i].x === nx && snake[i].y === ny) { lose(); return; }
     }
 
     snake.unshift({ x: nx, y: ny, seq: nextSeq++ });
 
-    if (food && nx === food.x && ny === food.y) {
+    if (willEat) {
       flash = 1;
       eaten++;
       Chip.sfx('eat');
