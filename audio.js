@@ -280,15 +280,38 @@
   // 뱀 속도(0 = 시작, 1 = 최고속)에 맞춰 게임 음악 템포를 끌어올린다.
   function setIntensity(x) {
     x = Math.max(0, Math.min(1, x || 0));
-    tempoMul = 0.8 + x * 0.75;          // 120bpm 기준 96 ~ 186bpm
+    tempoMul = 0.85 + x * 0.9;          // 120bpm 기준 102 ~ 210bpm
+  }
+
+  // 주파수를 훑고 지나가는 짧은 울음소리
+  function chirp(t, f0, f1, dur, gain) {
+    var o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.8, t + dur);
+
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.01);
   }
 
   function sfx(name) {
     if (!ctx || muted || paused) return;
     var t = ctx.currentTime + 0.001;
+
     if (name === 'eat') {
       tone('lead', t, freq('E5'), 0.055, 0.16);
       tone('lead', t + 0.055, freq('B5'), 0.075, 0.16);
+
+    } else if (name === 'squeak') {
+      // 쥐가 나타날 때 "찍찍" — 아주 작게
+      chirp(t, 1850, 3250, 0.05, 0.042);
+      chirp(t + 0.082, 2050, 3550, 0.045, 0.036);
     }
   }
 
@@ -319,6 +342,7 @@
     stop: stop,
     sfx: sfx,
     setIntensity: setIntensity,
+    tempo: function () { return { mul: tempoMul, bpm: cur ? Math.round(cur.bpm * (cur.dynamic ? tempoMul : 1)) : null }; },
     isMuted: function () { return muted; },
     setMuted: setMuted,
     setPaused: setPaused,

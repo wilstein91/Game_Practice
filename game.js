@@ -2,8 +2,8 @@
  * game.js — SNAKE
  *
  * 32 x 18 그리드, 시작 길이 5, 길이 400 달성 시 승리.
- * 속도는 1.4칸/초에서 시작해 쥐 한 마리당 균일한 폭으로 올라 400칸에서 18칸/초에 도달한다.
- * 쥐를 먹을 때마다 은 1개가 쌓이고, 은으로 상점에서 뱀 스킨을 살 수 있다.
+ * 속도는 2.4칸/초에서 시작해 쥐 한 마리당 균일한 폭으로 올라 400칸에서 18칸/초에 도달한다.
+ * 쥐를 먹을 때마다 Mice 1이 쌓이고, Mice로 상점에서 뱀 스킨을 살 수 있다.
  */
 (function () {
   'use strict';
@@ -16,7 +16,7 @@
   var START_LEN = 5;
   var WIN_LEN = 400;
 
-  var MIN_SPEED = 1.4;    // 시작 속도 (칸/초)
+  var MIN_SPEED = 2.4;    // 시작 속도 (칸/초)
   var MAX_SPEED = 18;     // 승리 길이에서 도달하는 최고 속도 (칸/초)
 
   var COUNTDOWN = ['3', '2', '1', 'Go!'];
@@ -43,52 +43,74 @@
     'ㅈ': 'up', 'ㅁ': 'left', 'ㄴ': 'down', 'ㅇ': 'right'
   };
 
+  function mod(a, b) { return ((a % b) + b) % b; }
+
   /* -------------------------------------------------------- 뱀 스킨 */
 
-  // 실제 뱀을 모티브로 한 스킨. 가격은 인기도에 따라 500 / 700 / 1000.
+  /*
+   * 실제 뱀의 생김새를 반영한다.
+   *   girth      — 몸통 굵기 배수 (아나콘다가 가장 굵다)
+   *   headShape  — lance(창끝) / blunt(뭉툭) / narrow(길쭉)
+   *   hood       — 목을 펼친 후드 (킹코브라)
+   *   pupil      — round / slit
+   *   bands      — 세그먼트 단위로 반복되는 띠 색
+   * 무늬는 세그먼트마다 붙는 고유 번호(seq)를 기준으로 찍히므로,
+   * 뱀이 길어져도 이미 그려진 무늬가 몸을 따라 흐르지 않는다.
+   */
   var SKINS = [
     {
-      id: 'gtp', ko: '녹색나무비단뱀', sci: 'Morelia viridis', price: 0,
-      pattern: 'spine',
-      base: '#35d96a', line: '#0a3c1e', mark: '#eafff0', head: '#4ee885', eye: '#ffd45e',
-      note: '선명한 잎사귀 초록에 등줄을 따라 흰 점이 흩뿌려진 기본 스킨.'
-    },
-    {
-      id: 'garter', ko: '가터뱀', sci: 'Thamnophis sirtalis', price: 500,
-      pattern: 'stripe',
-      base: '#46592c', line: '#141c0c', mark: '#e9e05c', head: '#546b34', eye: '#e9e05c',
-      note: '어두운 올리브 몸에 머리부터 꼬리까지 노란 세로줄이 흐른다.'
-    },
-    {
-      id: 'corn', ko: '옥수수뱀', sci: 'Pantherophis guttatus', price: 700,
-      pattern: 'saddle',
-      base: '#e8834a', line: '#3d1a0c', mark: '#c9312b', head: '#ef9a63', eye: '#ffb36b',
-      note: '주황 바탕 위에 검은 테를 두른 붉은 안장무늬가 이어진다.'
-    },
-    {
-      id: 'milk', ko: '밀크스네이크', sci: 'Lampropeltis triangulum', price: 700,
+      id: 'calking', ko: '캘리포니아 킹스네이크', sci: 'Lampropeltis californiae', price: 0,
       pattern: 'bands',
-      bands: ['#d8232a', '#d8232a', '#15100f', '#f4efe6', '#15100f'],
-      base: '#d8232a', line: '#120a0a', mark: '#f4efe6', head: '#e03a34', eye: '#ffd45e',
-      note: '빨강·검정·흰색 띠가 규칙적으로 반복되는 고전적인 무늬.'
+      bands: ['#23252c', '#23252c', '#f0e8d6'],
+      base: '#23252c', line: '#0b0c10', mark: '#f0e8d6',
+      head: '#2a2c34', eye: '#c9b27a', pupil: 'round',
+      girth: 0.95, headShape: 'lance',
+      note: '검은 몸에 크림색 띠가 촘촘하게 감긴다.'
     },
     {
-      id: 'albino', ko: '알비노 버미즈 파이톤', sci: 'Python bivittatus', price: 1000,
-      pattern: 'blotch',
-      base: '#fbf3dc', line: '#c2ab6d', mark: '#f5b23c', head: '#fffaea', eye: '#ff8f8f',
-      note: '색소가 빠진 흰 바탕에 노란 얼룩이 번지듯 퍼진다.'
+      id: 'milk', ko: '밀크스네이크', sci: 'Lampropeltis triangulum', price: 500,
+      pattern: 'bands',
+      bands: ['#c9302c', '#c9302c', '#2b2024', '#f2ece0', '#2b2024'],
+      base: '#c9302c', line: '#120d0f', mark: '#f2ece0',
+      head: '#2b2024', eye: '#d8b45c', pupil: 'round',
+      girth: 0.92, headShape: 'lance',
+      note: '빨강·검정·흰색 띠가 자로 잰 듯 균일하게 반복된다.'
     },
     {
-      id: 'diamondback', ko: '서부 다이아몬드방울뱀', sci: 'Crotalus atrox', price: 1000,
-      pattern: 'diamond',
-      base: '#9a8b6e', line: '#241f14', mark: '#efe6cf', head: '#a4957a', eye: '#e0c56b',
-      note: '사막 모래빛 몸을 덮은 또렷한 다이아몬드 무늬.'
+      id: 'ball', ko: '볼파이톤', sci: 'Python regius', price: 700,
+      pattern: 'ballblotch',
+      base: '#3b2c1a', line: '#150e06', mark: '#c9a24a',
+      head: '#48361f', eye: '#c08a3e', pupil: 'slit',
+      girth: 1.14, headShape: 'blunt', markStep: 2,
+      note: '굵고 짧은 몸에 황금빛 얼룩이 좌우로 번갈아 물린다.'
+    },
+    {
+      id: 'anaconda', ko: '그린 아나콘다', sci: 'Eunectes murinus', price: 700,
+      pattern: 'ovals',
+      base: '#5c6b34', line: '#191e0d', mark: '#171b0c', mark2: '#d8c25a',
+      head: '#67763c', eye: '#c8b25e', pupil: 'slit',
+      girth: 1.28, headShape: 'blunt', markStep: 2,
+      note: '가장 육중한 몸통. 올리브색 위에 검은 타원이 어긋나게 박힌다.'
+    },
+    {
+      id: 'cobra', ko: '킹코브라', sci: 'Ophiophagus hannah', price: 1000,
+      pattern: 'chevron',
+      base: '#6b5c33', line: '#211a0c', mark: '#e9dfa6',
+      head: '#7a6a3c', eye: '#b99a45', pupil: 'round',
+      girth: 0.9, headShape: 'narrow', hood: true, hoodMark: '#e9dfa6',
+      note: '목을 활짝 펼친 후드. 몸에는 옅은 갈매기 무늬가 이어진다.'
     }
   ];
+
+  var DEFAULT_SKIN = 'calking';
 
   function skinById(id) {
     for (var i = 0; i < SKINS.length; i++) if (SKINS[i].id === id) return SKINS[i];
     return SKINS[0];
+  }
+  function skinExists(id) {
+    for (var i = 0; i < SKINS.length; i++) if (SKINS[i].id === id) return true;
+    return false;
   }
 
   /* ------------------------------------------------------------- 저장 */
@@ -104,12 +126,16 @@
   }
 
   var hiScore = parseInt(load('snake.hiscore', '0'), 10) || 0;
-  var silver = parseInt(load('snake.silver', '0'), 10) || 0;
-  var equipped = load('snake.skin', 'gtp');
+  // 예전 '은' 잔액이 있으면 Mice로 넘겨받는다
+  var mice = parseInt(load('snake.mice', load('snake.silver', '0')), 10) || 0;
+
+  var equipped = load('snake.skin', DEFAULT_SKIN);
   var owned;
-  try { owned = JSON.parse(load('snake.owned', '["gtp"]')); } catch (e) { owned = ['gtp']; }
-  if (!Array.isArray(owned) || owned.indexOf('gtp') < 0) owned = ['gtp'];
-  if (owned.indexOf(equipped) < 0) equipped = 'gtp';
+  try { owned = JSON.parse(load('snake.owned', '[]')); } catch (e) { owned = []; }
+  if (!Array.isArray(owned)) owned = [];
+  owned = owned.filter(skinExists);
+  if (owned.indexOf(DEFAULT_SKIN) < 0) owned.push(DEFAULT_SKIN);
+  if (!skinExists(equipped) || owned.indexOf(equipped) < 0) equipped = DEFAULT_SKIN;
 
   function isOwned(id) { return owned.indexOf(id) >= 0; }
   function currentSkin() { return skinById(equipped); }
@@ -126,18 +152,18 @@
   var muteBtn = document.getElementById('muteBtn');
   var muteIcon = document.getElementById('muteIcon');
   var hiScoreEl = document.getElementById('hiScore');
-  var silverEl = document.getElementById('silverSlot');
+  var miceEl = document.getElementById('silverSlot');
   var toWinEl = document.getElementById('toWin');
   var hint = document.getElementById('hint');
   var shopEl = document.getElementById('shop');
-  var shopSilverEl = document.getElementById('shopSilver');
+  var shopMiceEl = document.getElementById('shopSilver');
   var shopCloseBtn = document.getElementById('shopClose');
   var skinListEl = document.getElementById('skinList');
 
   /* ------------------------------------------------------------- 상태 */
 
   var state = 'title';          // title | countdown | playing | paused | win | lose
-  var snake, dir, queue, food, eaten = 0, earned = 0;
+  var snake, dir, queue, food, eaten = 0, earned = 0, nextSeq = 0;
   var moveMs, moveAcc;
   var countdownIdx, countdownAcc;
   var wander, wanderAcc;
@@ -160,10 +186,15 @@
 
   function renderHud() {
     hiScoreEl.innerHTML = 'HI-SCORE <b>' + hiScore + '</b>';
-    silverEl.innerHTML = '🪙 은 <b>' + silver + '</b>';
-    var len = (state === 'title' || !snake) ? START_LEN : snake.length;
-    toWinEl.innerHTML = '승리까지 <b>' + Math.max(0, WIN_LEN - len) + '</b>';
-    shopSilverEl.innerHTML = '🪙 은 <b>' + silver + '</b>';
+    miceEl.innerHTML = '🐭 Mice <b>' + mice + '</b>';
+    shopMiceEl.innerHTML = '🐭 Mice <b>' + mice + '</b>';
+
+    // 남은 칸 수는 게임 중에만 의미가 있다
+    toWinEl.classList.toggle('hidden', state === 'title');
+    if (state !== 'title') {
+      var len = snake ? snake.length : START_LEN;
+      toWinEl.innerHTML = '승리까지 <b>' + Math.max(0, WIN_LEN - len) + '</b>';
+    }
   }
 
   function finishRun() {
@@ -173,8 +204,8 @@
       save('snake.hiscore', String(hiScore));
     }
     if (earned > 0) {
-      silver += earned;
-      save('snake.silver', String(silver));
+      mice += earned;
+      save('snake.mice', String(mice));
     }
   }
 
@@ -194,7 +225,6 @@
     g.fillStyle = grad;
     g.fillRect(0, 0, W, H);
 
-    // 이끼 패치
     for (var j = 0; j < 90; j++) {
       g.fillStyle = (j % 3 === 0) ? 'rgba(88,116,62,0.10)' : 'rgba(52,40,26,0.12)';
       g.beginPath();
@@ -204,7 +234,6 @@
       g.fill();
     }
 
-    // 흙 알갱이
     var speck = ['rgba(112,134,86,0.13)', 'rgba(62,46,30,0.18)',
                  'rgba(146,160,116,0.09)', 'rgba(30,42,28,0.20)'];
     for (var i = 0; i < 1600; i++) {
@@ -214,7 +243,6 @@
       g.fill();
     }
 
-    // 가장자리 그늘
     var vg = g.createRadialGradient(W / 2, H / 2, H * 0.24, W / 2, H / 2, H * 0.92);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(0,0,0,0.5)');
@@ -234,81 +262,65 @@
     return [dx / m, dy / m];
   }
 
-  function bodyColor(sk, i) {
-    return sk.bands ? sk.bands[i % sk.bands.length] : sk.base;
+  function bodyColor(sk, q) {
+    return sk.bands ? sk.bands[mod(q, sk.bands.length)] : sk.base;
   }
 
-  function drawMarks(g, pts, end, bw, sk) {
+  function drawMarks(g, pts, end, bw, sk, seqAt) {
     if (sk.pattern === 'bands' || end < 4) return;
 
-    var i, d, ang;
+    var step = sk.markStep || 3;
 
-    if (sk.pattern === 'stripe') {
-      // 등을 따라 흐르는 세로줄 + 옆구리 반점
-      g.beginPath();
-      g.moveTo(pts[0][0], pts[0][1]);
-      for (i = 1; i < end; i++) g.lineTo(pts[i][0], pts[i][1]);
-      g.strokeStyle = sk.mark;
-      g.lineWidth = bw * 0.22;
-      g.stroke();
+    for (var i = 2; i < end - 1; i++) {
+      var q = seqAt(i);
+      if (mod(q, step) !== 0) continue;
 
-      for (i = 2; i < end - 1; i += 2) {
-        d = dirAt(pts, i);
-        g.save();
-        g.translate(pts[i][0], pts[i][1]);
-        g.rotate(Math.atan2(d[1], d[0]));
-        g.fillStyle = 'rgba(233,224,92,0.55)';
-        g.beginPath(); g.arc(0, -bw * 0.33, bw * 0.09, 0, Math.PI * 2); g.fill();
-        g.beginPath(); g.arc(0, bw * 0.33, bw * 0.09, 0, Math.PI * 2); g.fill();
-        g.restore();
-      }
-      return;
-    }
+      var d = dirAt(pts, i);
+      var side = mod(Math.floor(q / step), 2) ? 1 : -1;
 
-    var step = (sk.pattern === 'spine') ? 3 : (sk.pattern === 'blotch' ? 3 : 4);
-
-    for (i = 2; i < end - 1; i += step) {
-      d = dirAt(pts, i);
-      ang = Math.atan2(d[1], d[0]);
       g.save();
       g.translate(pts[i][0], pts[i][1]);
-      g.rotate(ang);
+      g.rotate(Math.atan2(d[1], d[0]));
 
-      if (sk.pattern === 'spine') {
-        // 등줄을 따라 끊긴 흰 마름모 + 옆으로 흩뿌려진 작은 반점
-        var r = bw * 0.21;
+      if (sk.pattern === 'chevron') {
+        // 몸을 가로지르는 옅은 갈매기꼴 띠
+        g.strokeStyle = sk.mark;
+        g.globalAlpha = g.globalAlpha * 0.9;
+        g.lineWidth = bw * 0.30;
+        g.lineCap = 'round';
+        g.lineJoin = 'round';
+        g.beginPath();
+        g.moveTo(-bw * 0.16, -bw * 0.56);
+        g.lineTo(bw * 0.14, 0);
+        g.lineTo(-bw * 0.16, bw * 0.56);
+        g.stroke();
+
+      } else if (sk.pattern === 'ovals') {
+        // 어긋나게 박힌 검은 타원 + 반대쪽 노란 테 반점
         g.fillStyle = sk.mark;
         g.beginPath();
-        g.moveTo(r * 1.6, 0); g.lineTo(0, -r); g.lineTo(-r * 1.6, 0); g.lineTo(0, r);
-        g.closePath(); g.fill();
+        g.ellipse(0, side * bw * 0.13, TILE * 0.60, bw * 0.38, 0, 0, Math.PI * 2);
+        g.fill();
 
-        var a0 = g.globalAlpha;
-        g.globalAlpha = a0 * 0.6;
-        g.beginPath(); g.arc(-bw * 0.42, -bw * 0.26, bw * 0.075, 0, Math.PI * 2); g.fill();
-        g.beginPath(); g.arc(bw * 0.42, bw * 0.26, bw * 0.075, 0, Math.PI * 2); g.fill();
-        g.globalAlpha = a0;
+        g.fillStyle = sk.mark2;
+        g.beginPath(); g.arc(0, -side * bw * 0.40, bw * 0.115, 0, Math.PI * 2); g.fill();
+        g.fillStyle = sk.mark;
+        g.beginPath(); g.arc(0, -side * bw * 0.40, bw * 0.055, 0, Math.PI * 2); g.fill();
 
-      } else if (sk.pattern === 'saddle') {
+      } else if (sk.pattern === 'ballblotch') {
+        // 좌우로 번갈아 물리는 황금 얼룩
         g.fillStyle = sk.mark;
         g.strokeStyle = sk.line;
-        g.lineWidth = Math.max(1, bw * 0.07);
-        rrectOn(g, -TILE * 0.72, -bw * 0.44, TILE * 1.44, bw * 0.88, bw * 0.3);
-        g.fill(); g.stroke();
-
-      } else if (sk.pattern === 'diamond') {
-        g.fillStyle = sk.mark;
-        g.strokeStyle = sk.line;
-        g.lineWidth = Math.max(1, bw * 0.07);
+        g.lineWidth = Math.max(1, bw * 0.09);
         g.beginPath();
-        g.moveTo(TILE * 0.85, 0); g.lineTo(0, -bw * 0.44);
-        g.lineTo(-TILE * 0.85, 0); g.lineTo(0, bw * 0.44);
-        g.closePath(); g.fill(); g.stroke();
+        g.ellipse(0, side * bw * 0.12, TILE * 0.80, bw * 0.46, 0, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
 
-      } else if (sk.pattern === 'blotch') {
-        var wob = 0.72 + ((i * 37) % 11) / 22;      // i에 따라 결정되는 크기 변화
-        g.fillStyle = sk.mark;
+        // 얼룩 사이로 드러나는 어두운 바탕 — 가운데가 살짝 잘록하다
+        g.fillStyle = sk.base;
         g.beginPath();
-        g.ellipse(0, 0, TILE * 0.66 * wob, bw * 0.42 * wob, 0, 0, Math.PI * 2);
+        g.ellipse(0, side * bw * 0.62, TILE * 0.42, bw * 0.30, 0, 0, Math.PI * 2);
         g.fill();
       }
 
@@ -317,13 +329,42 @@
   }
 
   function drawHead(g, p, v, bw, sk, flick) {
+    var shape = sk.headShape || 'lance';
     var L = bw * 1.55, B = bw * 1.06;
+    if (shape === 'blunt')  { L = bw * 1.34; B = bw * 1.30; }
+    if (shape === 'narrow') { L = bw * 1.74; B = bw * 0.98; }
 
     g.save();
     g.translate(p[0], p[1]);
     g.rotate(Math.atan2(v.y, v.x));
 
-    // 혀 (머리 아래에 깔아 앞으로 뻗는다)
+    // 활짝 펼친 후드 (킹코브라) — 머리 뒤로 넓게 벌어지는 방패꼴
+    if (sk.hood) {
+      g.beginPath();
+      g.moveTo(L * 0.12, -B * 0.44);
+      g.bezierCurveTo(-L * 0.18, -B * 1.85, -L * 1.05, -B * 1.60, -L * 1.22, -B * 0.38);
+      g.quadraticCurveTo(-L * 1.30, 0, -L * 1.22, B * 0.38);
+      g.bezierCurveTo(-L * 1.05, B * 1.60, -L * 0.18, B * 1.85, L * 0.12, B * 0.44);
+      g.closePath();
+      g.fillStyle = sk.head;
+      g.fill();
+      g.strokeStyle = sk.line;
+      g.lineWidth = Math.max(1.6, bw * 0.11);
+      g.stroke();
+
+      // 킹코브라 특유의 갈매기 무늬 (스펙터클이 아니다)
+      g.strokeStyle = sk.hoodMark;
+      g.lineWidth = Math.max(1.8, bw * 0.20);
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      g.beginPath();
+      g.moveTo(-L * 1.00, -B * 0.95);
+      g.lineTo(-L * 0.52, 0);
+      g.lineTo(-L * 1.00, B * 0.95);
+      g.stroke();
+    }
+
+    // 혀
     if (flick > 0.02) {
       var tl = L * (0.52 + 0.42 * flick);
       g.strokeStyle = '#ff4d6d';
@@ -337,7 +378,7 @@
       g.stroke();
     }
 
-    // 창끝 모양 머리
+    // 머리
     g.beginPath();
     g.moveTo(L * 0.54, 0);
     g.quadraticCurveTo(L * 0.44, -B * 0.46, L * 0.04, -B * 0.5);
@@ -351,7 +392,7 @@
     g.lineWidth = Math.max(1.5, bw * 0.11);
     g.stroke();
 
-    // 눈 — 홍채 + 세로 동공
+    // 눈
     for (var s = -1; s <= 1; s += 2) {
       var ex = L * 0.14, ey = s * B * 0.29;
       g.beginPath(); g.arc(ex, ey, bw * 0.165, 0, Math.PI * 2);
@@ -359,22 +400,28 @@
       g.lineWidth = Math.max(1, bw * 0.05);
       g.strokeStyle = sk.line; g.stroke();
 
-      g.beginPath(); g.ellipse(ex, ey, bw * 0.045, bw * 0.115, 0, 0, Math.PI * 2);
-      g.fillStyle = '#150f09'; g.fill();
+      g.fillStyle = '#150f09';
+      g.beginPath();
+      if (sk.pupil === 'round') g.arc(ex, ey, bw * 0.075, 0, Math.PI * 2);
+      else g.ellipse(ex, ey, bw * 0.045, bw * 0.115, 0, 0, Math.PI * 2);
+      g.fill();
     }
 
     g.restore();
   }
 
   /*
-   * 이어진 한 마리로 그린다.
-   * pts: 픽셀 좌표 배열 (0번이 머리), o: { skin, width, alpha, headDir }
+   * 머리부터 꼬리까지 이어진 한 마리로 그린다.
+   * pts: 픽셀 좌표 배열 (0번이 머리), o: { skin, width, alpha, headDir, seqs }
    */
   function paintSnake(g, pts, o) {
     var n = pts.length;
     if (!n) return;
 
-    var sk = o.skin, bw = o.width;
+    var sk = o.skin;
+    var bw = o.width * (sk.girth || 1);
+    var seqs = o.seqs;
+    var seqAt = seqs ? function (i) { return seqs[i]; } : function (i) { return i; };
     var i, t;
 
     g.save();
@@ -383,7 +430,7 @@
     g.lineJoin = 'round';
 
     var taperN = Math.min(11, Math.max(2, Math.floor(n * 0.22)));
-    var end = Math.max(1, n - taperN);          // 몸통 구간의 끝 인덱스
+    var end = Math.max(1, n - taperN);
 
     function pathTo(limit) {
       g.beginPath();
@@ -398,11 +445,11 @@
       g.lineWidth = bw + 5;
       g.stroke();
 
-      // 2) 몸통 — 밴드 무늬는 색깔별로 묶어 한 번씩 칠한다
+      // 2) 몸통 — 띠 무늬는 색깔별로 묶어 한 번씩 칠한다
       if (sk.bands) {
         var groups = {};
         for (i = 0; i + 1 < end; i++) {
-          var c = bodyColor(sk, i);
+          var c = bodyColor(sk, seqAt(i));
           (groups[c] || (groups[c] = [])).push(i);
         }
         for (var col in groups) {
@@ -424,14 +471,14 @@
         g.stroke();
       }
 
-      // 3) 광택 (무늬가 흐려지지 않도록 무늬보다 먼저 깐다)
+      // 3) 광택 (무늬가 흐려지지 않도록 무늬보다 먼저)
       pathTo(end);
-      g.strokeStyle = 'rgba(255,255,255,0.11)';
+      g.strokeStyle = 'rgba(255,255,255,0.10)';
       g.lineWidth = bw * 0.26;
       g.stroke();
 
       // 4) 무늬
-      drawMarks(g, pts, end, bw, sk);
+      drawMarks(g, pts, end, bw, sk, seqAt);
 
       // 5) 꼬리 — 점점 가늘어진다 (외곽선 먼저, 그다음 몸통색)
       var from = end - 1, span = Math.max(1, (n - 1) - from);
@@ -449,7 +496,7 @@
         g.beginPath();
         g.moveTo(pts[i][0], pts[i][1]);
         g.lineTo(pts[i + 1][0], pts[i + 1][1]);
-        g.strokeStyle = bodyColor(sk, i);
+        g.strokeStyle = bodyColor(sk, seqAt(i));
         g.lineWidth = bw * (1 - t * 0.8);
         g.stroke();
       }
@@ -472,20 +519,18 @@
     g.restore();
   }
 
-  function cellsToPts(cells) {
-    var pts = [];
+  function drawSnake(cells, alpha, headDir) {
+    var pts = [], seqs = [];
     for (var i = 0; i < cells.length; i++) {
       pts.push([cells[i].x * TILE + TILE / 2, cells[i].y * TILE + TILE / 2]);
+      seqs.push(cells[i].seq);
     }
-    return pts;
-  }
-
-  function drawSnake(cells, alpha, headDir) {
-    paintSnake(ctx, cellsToPts(cells), {
+    paintSnake(ctx, pts, {
       skin: currentSkin(),
       width: TILE * 0.68,
       alpha: alpha,
-      headDir: DIRS[headDir]
+      headDir: DIRS[headDir],
+      seqs: seqs
     });
   }
 
@@ -495,8 +540,9 @@
     var cells = [];
     var sx = 8 + Math.floor(Math.random() * 16);
     var sy = 4 + Math.floor(Math.random() * 10);
-    for (var i = 0; i < 11; i++) cells.push({ x: sx - i, y: sy });
-    return { cells: cells, dir: 'right' };
+    var n = 13;
+    for (var i = 0; i < n; i++) cells.push({ x: sx - i, y: sy, seq: n - i });
+    return { cells: cells, dir: 'right', next: n + 1 };
   }
 
   function inBounds(x, y) {
@@ -523,7 +569,7 @@
     }
 
     w.dir = choice;
-    w.cells.unshift({ x: nx, y: ny });
+    w.cells.unshift({ x: nx, y: ny, seq: w.next++ });
     w.cells.pop();
   }
 
@@ -532,7 +578,11 @@
   function resetGame() {
     var cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
     snake = [];
-    for (var i = 0; i < START_LEN; i++) snake.push({ x: cx - i, y: cy });
+    // 머리가 가장 큰 seq를 갖고 꼬리로 갈수록 줄어든다 → 무늬가 몸에 고정된다
+    for (var i = 0; i < START_LEN; i++) {
+      snake.push({ x: cx - i, y: cy, seq: START_LEN - i });
+    }
+    nextSeq = START_LEN + 1;
     dir = 'right';
     queue = [];
     eaten = 0;
@@ -558,6 +608,7 @@
     var cell = free[Math.floor(Math.random() * free.length)];
     cell.face = Math.random() < 0.5 ? -1 : 1;   // 쥐가 바라보는 방향
     cell.born = now;                            // 등장 연출 기준 시각
+    Chip.sfx('squeak');
     return cell;
   }
 
@@ -574,7 +625,7 @@
       if (snake[i].x === nx && snake[i].y === ny) { lose(); return; }
     }
 
-    snake.unshift({ x: nx, y: ny });
+    snake.unshift({ x: nx, y: ny, seq: nextSeq++ });
 
     if (food && nx === food.x && ny === food.y) {
       flash = 1;
@@ -718,10 +769,9 @@
   function drawMouse(f) {
     var s = TILE;
     var cx = f.x * s + s / 2;
-    var cy = f.y * s + s / 2 + Math.sin(now / 320) * 0.9;   // 숨 쉬듯 들썩인다
+    var cy = f.y * s + s / 2 + Math.sin(now / 320) * 0.9;
     var face = f.face || 1;
 
-    // 등장 연출 — 튀어나오면서 파문이 퍼진다
     var age = (now - (f.born || 0)) / POP_MS;
     var pop = age >= 1 ? 1 : 1 - Math.pow(1 - age, 3);
     var scale = 0.35 + 0.65 * pop;
@@ -743,7 +793,6 @@
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
 
-    // 꼬리
     ctx.strokeStyle = '#e79cae';
     ctx.lineWidth = s * 0.055;
     ctx.lineCap = 'round';
@@ -752,7 +801,6 @@
     ctx.quadraticCurveTo(-s * 0.48, s * 0.14, -s * 0.44, -s * 0.10);
     ctx.stroke();
 
-    // 귀
     ctx.fillStyle = '#c9d1dd';
     ctx.beginPath(); ctx.arc(s * 0.06, -s * 0.17, s * 0.115, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
@@ -760,7 +808,6 @@
     ctx.fillStyle = '#ff9fb2';
     ctx.beginPath(); ctx.arc(s * 0.07, -s * 0.16, s * 0.058, 0, Math.PI * 2); ctx.fill();
 
-    // 몸통 + 머리
     ctx.shadowColor = 'rgba(20,10,14,0.6)';
     ctx.shadowBlur = 8;
     ctx.fillStyle = '#e6ebf3';
@@ -768,13 +815,11 @@
     ctx.beginPath(); ctx.ellipse(s * 0.19, s * 0.055, s * 0.155, s * 0.135, 0, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
 
-    // 눈 · 코
     ctx.fillStyle = '#161b22';
     ctx.beginPath(); ctx.arc(s * 0.20, s * 0.015, s * 0.035, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#ff6f8b';
     ctx.beginPath(); ctx.arc(s * 0.335, s * 0.085, s * 0.033, 0, Math.PI * 2); ctx.fill();
 
-    // 수염
     ctx.strokeStyle = 'rgba(255,240,245,0.85)';
     ctx.lineWidth = Math.max(1, s * 0.02);
     ctx.beginPath();
@@ -952,11 +997,43 @@
     ctx.fillRect(0, 0, W, H);
   }
 
+  // 스킨 5종을 실제 인게임 크기로 나란히 놓고 비교하는 화면 (SNAKE.sheet())
+  var sheetMode = false;
+
+  function drawSheet() {
+    var rowH = H / SKINS.length;
+    for (var s = 0; s < SKINS.length; s++) {
+      var sk = SKINS[s];
+      var yc = rowH * (s + 0.5);
+      var pts = [], seqs = [];
+      var n = Math.floor((W * 0.62) / TILE);
+      for (var i = 0; i < n; i++) {
+        var t = i / (n - 1);
+        pts.push([W * 0.90 - i * TILE, yc + Math.sin(t * Math.PI * 2) * rowH * 0.20]);
+        seqs.push(n - i);
+      }
+      paintSnake(ctx, pts, { skin: sk, width: TILE * 0.68, seqs: seqs });
+
+      ctx.save();
+      ctx.font = 'bold 15px ' + FONT;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(220,255,235,0.85)';
+      ctx.fillText(sk.ko, 14, yc - 10);
+      ctx.font = 'italic 12px ' + FONT;
+      ctx.fillStyle = 'rgba(200,255,225,0.45)';
+      ctx.fillText(sk.sci, 14, yc + 8);
+      ctx.restore();
+    }
+  }
+
   function draw() {
     drawBg();
 
+    if (sheetMode) { drawSheet(); return; }
+
     if (state === 'title') {
-      drawSnake(wander.cells, 0.42, wander.dir);
+      drawSnake(wander.cells, 0.5, wander.dir);
       veil(0.5);
       drawLogo(W / 2, H * 0.30, 27);
 
@@ -991,7 +1068,7 @@
         text('You Win!', W / 2, H * 0.32, 96, '#b9ff5a');
         text('SCORE ' + snake.length, W / 2, H * 0.455, 30,
              'rgba(210,255,230,0.85)', 'none');
-        text('은 +' + earned + ' 획득', W / 2, H * 0.545, 22,
+        text('Mice +' + earned, W / 2, H * 0.545, 22,
              'rgba(255,222,150,0.85)', 'none');
 
       } else if (state === 'lose') {
@@ -1000,7 +1077,7 @@
              'rgba(255,59,92,0.75)');
         text('SCORE ' + snake.length + '   ·   승리까지 ' + Math.max(0, WIN_LEN - snake.length) + ' 남았습니다',
              W / 2, H * 0.455, 24, 'rgba(255,215,222,0.8)', 'none');
-        text('은 +' + earned + ' 획득', W / 2, H * 0.545, 22,
+        text('Mice +' + earned, W / 2, H * 0.545, 22,
              'rgba(255,222,150,0.85)', 'none');
       }
     }
@@ -1015,23 +1092,27 @@
 
   var shopOpen = false;
 
-  function previewPts(w, h) {
-    var pts = [], N = 30;
-    for (var i = 0; i < N; i++) {
-      var t = i / (N - 1);
-      pts.push([w * (0.87 - t * 0.76), h * (0.5 + Math.sin(t * Math.PI * 2.15) * 0.24)]);
-    }
-    return pts;
-  }
-
   function paintPreview(cv, skin) {
     var g = cv.getContext('2d');
-    g.clearRect(0, 0, cv.width, cv.height);
-    // headDir는 넘기지 않는다 — pts[0]과 pts[1]에서 바깥쪽 방향이 자동으로 계산된다.
-    paintSnake(g, previewPts(cv.width, cv.height), {
-      skin: skin,
-      width: cv.height * 0.30
-    });
+    var w = cv.width, h = cv.height;
+    g.clearRect(0, 0, w, h);
+
+    // 세그먼트 간격 / 몸통 굵기 비율을 인게임(32px / 21.8px)과 맞춰야
+    // 띠 무늬가 실제 플레이 화면과 같은 굵기로 보인다.
+    var bw = h * 0.24 * (skin.girth || 1);
+    var span = w * 0.74;
+    var N = Math.max(8, Math.round(span / (bw * 1.47))) + 1;
+
+    var pts = [];
+    for (var i = 0; i < N; i++) {
+      var t = i / (N - 1);
+      pts.push([w * 0.86 - t * span, h * (0.5 + Math.sin(t * Math.PI * 2.1) * 0.135)]);
+    }
+    // headDir는 넘기지 않는다 — pts[0]과 pts[1]에서 바깥쪽 방향이 자동 계산된다.
+    g.save();
+    g.translate(skin.hood ? w * 0.03 : 0, 0);
+    paintSnake(g, pts, { skin: skin, width: h * 0.24 });
+    g.restore();
   }
 
   function renderShop() {
@@ -1045,7 +1126,7 @@
 
       var cv = document.createElement('canvas');
       cv.className = 'skinPreview';
-      cv.width = 300; cv.height = 74;
+      cv.width = 380; cv.height = 68;
       card.appendChild(cv);
 
       var name = document.createElement('div');
@@ -1068,7 +1149,7 @@
 
       var price = document.createElement('span');
       price.className = 'skinPrice' + (sk.price ? '' : ' free');
-      price.textContent = sk.price ? ('🪙 ' + sk.price) : '기본 제공';
+      price.textContent = sk.price ? ('🐭 ' + sk.price) : '기본 제공';
       foot.appendChild(price);
 
       var btn = document.createElement('button');
@@ -1083,11 +1164,11 @@
         btn.textContent = '장착';
         btn.classList.add('equip');
         btn.onclick = function () { equip(sk.id); };
-      } else if (silver >= sk.price) {
+      } else if (mice >= sk.price) {
         btn.textContent = '구매';
         btn.onclick = function () { buy(sk.id); };
       } else {
-        btn.textContent = '은 부족';
+        btn.textContent = 'Mice 부족';
         btn.classList.add('poor');
         btn.onclick = function () {
           card.classList.remove('nope');
@@ -1113,10 +1194,10 @@
 
   function buy(id) {
     var sk = skinById(id);
-    if (isOwned(id) || silver < sk.price) return;
-    silver -= sk.price;
+    if (isOwned(id) || mice < sk.price) return;
+    mice -= sk.price;
     owned.push(id);
-    save('snake.silver', String(silver));
+    save('snake.mice', String(mice));
     save('snake.owned', JSON.stringify(owned));
     equip(id);
     renderHud();
@@ -1162,7 +1243,7 @@
   function debugGrow(n) {
     var tail = snake[snake.length - 1];
     for (var i = 0; i < n && snake.length < WIN_LEN - 1; i++) {
-      snake.push({ x: tail.x, y: tail.y });
+      snake.push({ x: tail.x, y: tail.y, seq: tail.seq - 1 - i });
     }
     moveMs = intervalFor(snake.length);
     Chip.setIntensity(intensityFor(snake.length));
@@ -1171,7 +1252,8 @@
 
   function debugWin() {
     var tail = snake[snake.length - 1];
-    while (snake.length < WIN_LEN) snake.push({ x: tail.x, y: tail.y });
+    var k = 0;
+    while (snake.length < WIN_LEN) snake.push({ x: tail.x, y: tail.y, seq: tail.seq - 1 - (k++) });
     win();
   }
 
@@ -1231,7 +1313,7 @@
         cellsPerSec: snake ? Math.round(speedFor(snake.length) * 100) / 100 : null,
         toWin: snake ? Math.max(0, WIN_LEN - snake.length) : WIN_LEN - START_LEN,
         eaten: eaten,
-        silver: silver,
+        mice: mice,
         skin: equipped,
         owned: owned.slice(),
         head: snake ? { x: snake[0].x, y: snake[0].y, dir: dir } : null,
@@ -1247,13 +1329,16 @@
       }
       return rows;
     },
-    grantSilver: function (n) {
-      silver += n;
-      save('snake.silver', String(silver));
+    grantMice: function (n) {
+      mice += n;
+      save('snake.mice', String(mice));
       renderHud();
       if (shopOpen) renderShop();
-      return silver;
-    }
+      return mice;
+    },
+    skins: function () { return SKINS.map(function (s) { return s.id + ' / ' + s.ko + ' / ' + s.price; }); },
+    // 스킨 5종을 인게임 크기로 나란히 비교 — SNAKE.sheet() 로 켜고 SNAKE.sheet(false) 로 끈다
+    sheet: function (on) { sheetMode = (on !== false); return sheetMode; }
   };
 
   ground = buildGround();
