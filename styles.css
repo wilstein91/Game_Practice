@@ -1,11 +1,21 @@
+/*
+ * 정글 팔레트. 형광 네온 대신 실제 숲에서 볼 수 있는 색으로 맞췄다.
+ * 잎사귀 · 이끼 · 수관 · 붉은 흙 · 호박(수액) 다섯 축으로 잡고,
+ * 채도와 명도를 낮춰 어두운 배경 위에서 눈이 부시지 않게 한다.
+ */
 :root {
-  --bg:      #05080b;
-  --neon:    #39ff88;
-  --ink:     #e8fff3;
-  --danger:  #ff3b5c;
-  --gold:    #ffd166;
-  --panel:   rgba(9, 24, 17, .72);
-  --edge:    rgba(57, 255, 136, .22);
+  --bg:      #0b1310;              /* 밤의 숲 바닥 */
+  --leaf:    #7cb342;              /* 잎사귀 — 주 강조색 */
+  --moss:    #5c8a3f;              /* 이끼 */
+  --canopy:  #2f4a2b;              /* 짙은 수관 */
+  --ink:     #e7efe1;              /* 뼈흰색, 살짝 따뜻하게 */
+  --danger:  #c4553f;              /* 붉은 흙 */
+  --gold:    #cfa14e;              /* 호박(수액) */
+  --focus:   #e8b64c;              /* 키보드 초점 — 초록 계열과 가장 크게 대비된다 */
+  --panel:   rgba(19, 32, 23, .82);
+  --edge:    rgba(124, 179, 66, .24);
+
+  --neon:    var(--leaf);          /* 예전 이름을 쓰던 자리를 위한 별칭 */
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +28,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 50% 26%, #101a12 0%, #05080b 72%);
+  background: radial-gradient(circle at 50% 26%, #16241a 0%, #0b1310 74%);
   font-family: "Trebuchet MS", "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
   color: var(--ink);
   overflow: hidden;
@@ -43,7 +53,7 @@ body {
   padding: 8px 13px;
   font-size: clamp(10px, 1.2vw, 14px);
   letter-spacing: .08em;
-  color: rgba(200, 255, 225, .62);
+  color: rgba(206, 224, 196, .62);
   background: var(--panel);
   border: 1px solid var(--edge);
   border-radius: 9px;
@@ -55,11 +65,11 @@ body {
   font-size: 1.2em;
   font-weight: 700;
   color: var(--neon);
-  text-shadow: 0 0 12px rgba(57, 255, 136, .55);
+  text-shadow: 0 0 9px rgba(124, 179, 66, .38);
 }
 
-#silverSlot b { color: #e6e9f2; text-shadow: 0 0 12px rgba(220, 230, 250, .45); }
-#toWin b      { color: var(--gold); text-shadow: 0 0 12px rgba(255, 209, 102, .5); }
+#silverSlot b { color: #e2e8d0; text-shadow: 0 0 9px rgba(226, 232, 208, .35); }
+#toWin b      { color: var(--gold); text-shadow: 0 0 9px rgba(207, 161, 78, .42); }
 
 #muteBtn {
   margin-left: auto;
@@ -68,16 +78,16 @@ body {
   font: inherit;
   font-size: clamp(10px, 1.2vw, 14px);
   letter-spacing: .08em;
-  color: rgba(200, 255, 225, .78);
+  color: rgba(206, 224, 196, .78);
   background: var(--panel);
   border: 1px solid var(--edge);
   border-radius: 9px;
   white-space: nowrap;
   transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
-#muteBtn:hover { background: rgba(14, 48, 30, .9); border-color: rgba(57, 255, 136, .6); color: var(--ink); }
+#muteBtn:hover { background: rgba(34, 54, 34, .92); border-color: rgba(124, 179, 66, .6); color: var(--ink); }
 #muteBtn:focus-visible { outline: 2px solid var(--neon); outline-offset: 3px; }
-#muteBtn.off { color: rgba(200, 255, 225, .38); }
+#muteBtn.off { color: rgba(206, 224, 196, .38); }
 
 /* ------------------------------------------------------------ 게임 화면 */
 
@@ -92,10 +102,10 @@ canvas#game {
   width: 100%;
   height: 100%;
   border-radius: 10px;
-  background: #1b241b;
+  background: #1e2a1c;
   box-shadow:
-    0 0 0 2px rgba(57, 255, 136, .18),
-    0 0 70px rgba(57, 255, 136, .10),
+    0 0 0 2px rgba(124, 179, 66, .18),
+    0 0 60px rgba(124, 179, 66, .07),
     0 20px 60px rgba(0, 0, 0, .65);
 }
 
@@ -117,27 +127,27 @@ canvas#game {
   cursor: pointer;
   font: 700 clamp(15px, 2.1vw, 25px)/1 "Trebuchet MS", "Malgun Gothic", "Segoe UI", sans-serif;
   letter-spacing: .06em;
-  color: #04160c;
-  background: linear-gradient(180deg, #8affbc, #22c96f);
+  color: #101c0b;
+  background: linear-gradient(180deg, #9ccc65, #5a9134);
   border: 0;
   border-radius: 999px;
   padding: .78em 2.3em;
-  box-shadow: 0 0 26px rgba(57, 255, 136, .55), 0 6px 0 #0c6b3c;
+  box-shadow: 0 0 18px rgba(124, 179, 66, .30), 0 6px 0 #33531f;
   transition: transform .08s ease, box-shadow .15s ease;
 }
 
-.btn:hover  { box-shadow: 0 0 38px rgba(57, 255, 136, .85), 0 6px 0 #0c6b3c; }
-.btn:active { transform: translateY(4px); box-shadow: 0 0 18px rgba(57, 255, 136, .5), 0 2px 0 #0c6b3c; }
+.btn:hover  { box-shadow: 0 0 26px rgba(124, 179, 66, .48), 0 6px 0 #33531f; }
+.btn:active { transform: translateY(4px); box-shadow: 0 0 12px rgba(124, 179, 66, .3), 0 2px 0 #33531f; }
 .btn:focus-visible { outline: 3px solid #b9ff5a; outline-offset: 4px; }
 
 .btn.ghost {
-  color: #bff7d5;
-  background: rgba(8, 30, 19, .82);
-  border: 2px solid rgba(57, 255, 136, .5);
+  color: #cfe3b8;
+  background: rgba(24, 40, 26, .86);
+  border: 2px solid rgba(124, 179, 66, .5);
   padding: calc(.78em - 2px) 1.7em;
-  box-shadow: 0 0 20px rgba(57, 255, 136, .22), 0 6px 0 #0a4227;
+  box-shadow: 0 0 14px rgba(124, 179, 66, .16), 0 6px 0 #2b451c;
 }
-.btn.ghost:hover { background: rgba(14, 52, 32, .92); box-shadow: 0 0 30px rgba(57, 255, 136, .4), 0 6px 0 #0a4227; }
+.btn.ghost:hover { background: rgba(36, 58, 36, .94); box-shadow: 0 0 20px rgba(124, 179, 66, .3), 0 6px 0 #2b451c; }
 
 /* --------------------------------------------------------------- 상점 */
 
@@ -151,8 +161,8 @@ canvas#game {
   flex-direction: column;
   padding: 3% 3.4%;
   border-radius: 10px;
-  background: rgba(7, 14, 10, .93);
-  border: 2px solid rgba(57, 255, 136, .3);
+  background: rgba(13, 22, 15, .95);
+  border: 2px solid rgba(124, 179, 66, .3);
   backdrop-filter: blur(3px);
 }
 
@@ -161,7 +171,7 @@ canvas#game {
   align-items: center;
   gap: 14px;
   padding-bottom: 2.2%;
-  border-bottom: 1px solid rgba(57, 255, 136, .18);
+  border-bottom: 1px solid rgba(124, 179, 66, .18);
 }
 
 #shopHead h2 {
@@ -169,7 +179,7 @@ canvas#game {
   font-size: clamp(16px, 2.3vw, 27px);
   letter-spacing: .04em;
   color: var(--ink);
-  text-shadow: 0 0 18px rgba(57, 255, 136, .4);
+  text-shadow: 0 0 12px rgba(124, 179, 66, .3);
 }
 
 #shopSilver {
@@ -177,13 +187,13 @@ canvas#game {
   padding: 7px 14px;
   font-size: clamp(11px, 1.35vw, 15px);
   letter-spacing: .06em;
-  color: rgba(210, 240, 255, .7);
-  background: rgba(12, 32, 22, .9);
-  border: 1px solid rgba(57, 255, 136, .25);
+  color: rgba(214, 226, 200, .72);
+  background: rgba(28, 44, 30, .9);
+  border: 1px solid rgba(124, 179, 66, .25);
   border-radius: 8px;
   white-space: nowrap;
 }
-#shopSilver b { color: #eef2ff; font-size: 1.2em; }
+#shopSilver b { color: #ecefdf; font-size: 1.2em; }
 
 #shopClose {
   width: 34px;
@@ -191,12 +201,12 @@ canvas#game {
   flex: none;
   cursor: pointer;
   font-size: 16px;
-  color: rgba(200, 255, 225, .7);
-  background: rgba(12, 32, 22, .9);
-  border: 1px solid rgba(57, 255, 136, .25);
+  color: rgba(206, 224, 196, .7);
+  background: rgba(28, 44, 30, .9);
+  border: 1px solid rgba(124, 179, 66, .25);
   border-radius: 8px;
 }
-#shopClose:hover { color: var(--ink); border-color: rgba(57, 255, 136, .65); }
+#shopClose:hover { color: var(--ink); border-color: rgba(124, 179, 66, .65); }
 
 /* 5장이 스크롤 없이 한 줄에 들어가도록 */
 #skinList {
@@ -212,27 +222,27 @@ canvas#game {
 }
 
 #skinList::-webkit-scrollbar { width: 8px; }
-#skinList::-webkit-scrollbar-thumb { background: rgba(57, 255, 136, .25); border-radius: 4px; }
+#skinList::-webkit-scrollbar-thumb { background: rgba(124, 179, 66, .25); border-radius: 4px; }
 
 .skinCard {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 7px 8px 9px;
-  background: rgba(13, 30, 21, .85);
-  border: 1px solid rgba(57, 255, 136, .17);
+  background: rgba(24, 38, 26, .86);
+  border: 1px solid rgba(124, 179, 66, .17);
   border-radius: 11px;
   transition: border-color .15s ease, transform .1s ease;
 }
-.skinCard:hover { border-color: rgba(57, 255, 136, .42); }
-.skinCard.on { border-color: var(--neon); box-shadow: 0 0 22px rgba(57, 255, 136, .2) inset; }
+.skinCard:hover { border-color: rgba(124, 179, 66, .42); }
+.skinCard.on { border-color: var(--neon); box-shadow: 0 0 22px rgba(124, 179, 66, .2) inset; }
 .skinCard.locked .skinPreview { opacity: .55; filter: grayscale(.25); }
 
 .skinPreview {
   width: 100%;
   height: auto;
   border-radius: 6px;
-  background: linear-gradient(180deg, #382e25, #251e18);
+  background: linear-gradient(180deg, #3a3126, #262019);
 }
 
 .skinName {
@@ -251,8 +261,8 @@ canvas#game {
   gap: 4px;
   margin-top: auto;
 }
-.skinPrice { font-size: 11.5px; color: #eef2ff; letter-spacing: .03em; white-space: nowrap; text-align: center; }
-.skinPrice.free { color: rgba(200, 255, 225, .5); }
+.skinPrice { font-size: 11.5px; color: #ecefdf; letter-spacing: .03em; white-space: nowrap; text-align: center; }
+.skinPrice.free { color: rgba(206, 224, 196, .5); }
 
 .skinBtn {
   width: 100%;
@@ -260,8 +270,8 @@ canvas#game {
   cursor: pointer;
   font: 700 11.5px/1 inherit;
   letter-spacing: .04em;
-  color: #04160c;
-  background: linear-gradient(180deg, #8affbc, #22c96f);
+  color: #101c0b;
+  background: linear-gradient(180deg, #9ccc65, #5a9134);
   border: 0;
   border-radius: 999px;
   white-space: nowrap;
@@ -270,9 +280,9 @@ canvas#game {
 .skinBtn:hover  { filter: brightness(1.12); }
 .skinBtn:active { transform: translateY(1px); }
 
-.skinBtn.equipped { color: rgba(200, 255, 225, .85); background: rgba(57, 255, 136, .16); border: 1px solid rgba(57, 255, 136, .5); cursor: default; }
-.skinBtn.equip    { color: #bff7d5; background: rgba(12, 44, 27, .95); border: 1px solid rgba(57, 255, 136, .45); }
-.skinBtn.poor     { color: rgba(255, 200, 200, .75); background: rgba(60, 20, 24, .9); border: 1px solid rgba(255, 90, 110, .35); cursor: not-allowed; }
+.skinBtn.equipped { color: rgba(206, 224, 196, .85); background: rgba(124, 179, 66, .16); border: 1px solid rgba(124, 179, 66, .5); cursor: default; }
+.skinBtn.equip    { color: #cfe3b8; background: rgba(30, 50, 30, .95); border: 1px solid rgba(124, 179, 66, .45); }
+.skinBtn.poor     { color: rgba(232, 186, 172, .8); background: rgba(58, 30, 24, .9); border: 1px solid rgba(196, 85, 63, .4); cursor: not-allowed; }
 
 @keyframes nope { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
 .skinCard.nope { animation: nope .32s ease; }
@@ -280,7 +290,7 @@ canvas#game {
 #shopNote {
   margin: 10px 0 0;
   font-size: clamp(10px, 1.15vw, 12.5px);
-  color: rgba(200, 255, 225, .45);
+  color: rgba(206, 224, 196, .45);
   text-align: center;
 }
 #shopNote b { color: rgba(230, 240, 255, .8); }
@@ -291,7 +301,7 @@ canvas#game {
   min-height: 20px;
   text-align: center;
   font-size: clamp(10px, 1.15vw, 13px);
-  color: rgba(200, 255, 225, .5);
+  color: rgba(206, 224, 196, .5);
 }
 
 #hint { animation: pulse 1.8s ease-in-out infinite; }
@@ -350,12 +360,12 @@ canvas#game {
 }
 
 /* 상태별 색 — 문구는 script.js가 함께 갈아끼운다 */
-#stateBadge.state-title     { --st: #9fb8ab; }
-#stateBadge.state-countdown { --st: #ffd166; }
-#stateBadge.state-playing   { --st: #39ff88; }
-#stateBadge.state-paused    { --st: #6bc9ff; }
-#stateBadge.state-win       { --st: #b9ff5a; }
-#stateBadge.state-lose      { --st: #ff6b81; }
+#stateBadge.state-title     { --st: #93a58c; }   /* 마른 잎 */
+#stateBadge.state-countdown { --st: #cfa14e; }   /* 호박 */
+#stateBadge.state-playing   { --st: #7cb342; }   /* 잎사귀 */
+#stateBadge.state-paused    { --st: #6f9fb0; }   /* 안개 낀 물 */
+#stateBadge.state-win       { --st: #a8cc6a; }   /* 새순 */
+#stateBadge.state-lose      { --st: #c4553f; }   /* 붉은 흙 */
 
 /* 진행 중과 카운트다운만 맥박이 뛴다 — 멈춘 상태와 한눈에 구분된다 */
 #stateBadge.state-playing .dot,
@@ -371,77 +381,70 @@ canvas#game {
   #hint { animation: none !important; }
 }
 
-/* ---------------------------------------------------------- 터치 조작부 */
+/* ------------------------------------------------------- 일시정지 버튼 */
 
 /*
- * 손끝의 접촉면은 대략 45px이다. 한 변 64px에 간격을 두어 오입력을 막는다.
- * 데스크톱에서는 키보드가 있으므로 숨기고, 터치 기기와 좁은 화면에서만 띄운다.
+ * D패드를 걷어낸 자리를 대신한다. 터치 환경에는 ESC가 없으므로
+ * 일시정지 창구가 하나는 있어야 한다. 데스크톱에서는 숨긴다.
  */
-#pad {
+#pauseBtn {
   display: none;
-  grid-template-areas:
-    ".    up    ."
-    "left mid   right"
-    ".    down  .";
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: min(290px, 74vw);
-  margin: 2px auto 0;
-  touch-action: manipulation;
+  min-width: 46px;
+  min-height: 44px;
+  padding: 8px 13px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: rgba(206, 224, 196, .78);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
+#pauseBtn:hover { background: rgba(34, 54, 34, .92); border-color: rgba(124, 179, 66, .55); color: var(--ink); }
 
 /*
- * 버튼을 정사각형으로 두면 3행이 260px을 넘어 세로가 짧은 휴대폰에서 잘린다.
- * 높이만 뷰포트에 맞춰 줄이고 폭은 그리드에 맡겨, 가로로 넓은 직사각형이 되게 한다.
- * 엄지는 세로보다 가로로 움직이므로 이 편이 오히려 누르기 쉽다.
+ * 가로모드를 전제로 만든 화면이다. 세로로 들고 있으면 16:9 캔버스가
+ * 화면 폭에 갇혀 작아지므로, 돌리라고 한 줄 알려준다.
  */
-.padBtn {
-  min-width: 64px;
-  height: clamp(54px, 8.4vh, 78px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 25px;
-  line-height: 1;
-  color: #bff7d5;
-  background: rgba(10, 34, 22, .92);
-  border: 2px solid rgba(57, 255, 136, .38);
-  border-radius: 16px;
-  box-shadow: 0 4px 0 rgba(6, 48, 28, .9);
-  transition: background .1s ease, transform .06s ease, box-shadow .06s ease;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
+#rotateHint { display: none; }
+
+@media (orientation: portrait) and (max-width: 860px) {
+  #rotateHint { display: block; color: var(--gold); opacity: .75; }
 }
 
-.padBtn:active,
-.padBtn.on {
-  transform: translateY(4px);
-  background: rgba(24, 78, 48, .96);
-  border-color: var(--neon);
-  box-shadow: 0 0 18px rgba(57, 255, 136, .45), 0 0 0 rgba(6, 48, 28, .9);
+/* ------------------------------------------------------- 키보드 초점 */
+
+/*
+ * TAB을 한 번이라도 누르기 전에는 테두리를 그리지 않는다. 마우스로만 쓰는
+ * 사람에게 초점 테두리는 잡음일 뿐이고, 키보드로 옮겨 다니는 순간부터는
+ * 지금 어디에 있는지가 반드시 보여야 한다. body.kbd가 그 경계다.
+ * 초록 계열 UI 위에서 가장 크게 대비되는 호박색을 쓴다.
+ */
+body.kbd :focus {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
-.padBtn:focus-visible { outline: 3px solid var(--neon); outline-offset: 3px; }
+body:not(.kbd) :focus { outline: none; }
 
-.padBtn.up    { grid-area: up; }
-.padBtn.left  { grid-area: left; }
-.padBtn.mid   { grid-area: mid; font-size: 17px; color: #9fd8ff; border-color: rgba(107, 201, 255, .4); }
-.padBtn.right { grid-area: right; }
-.padBtn.down  { grid-area: down; }
-
-.padBtn.mid:active, .padBtn.mid.on { border-color: #6bc9ff; box-shadow: 0 0 18px rgba(107, 201, 255, .45); }
-
-/* 터치 기기이거나 화면이 좁으면 조작부를 띄운다 */
-@media (pointer: coarse) { #pad { display: grid; } }
-@media (max-width: 860px) { #pad { display: grid; } }
+/* 캔버스는 조작 대상이 아니므로 초점 순서에서 뺀다 */
+canvas#game { touch-action: none; }
 
 /* ------------------------------------------------------------ 모바일 */
 
+/*
+ * 가로모드 플레이를 전제한다. 세로에서도 깨지지는 않지만, 캔버스가 16:9라
+ * 가로로 눕혔을 때 화면을 가장 크게 쓴다. 조작은 전부 스와이프로 하므로
+ * 캔버스 아래에 자리를 잡아먹는 요소를 두지 않는다.
+ */
 @media (max-width: 860px), (pointer: coarse) {
   body {
     padding: 8px;
-    overflow-y: auto;          /* 조작부까지 닿도록 세로 스크롤을 연다 */
+    overflow-y: auto;
     align-items: flex-start;
   }
 
@@ -451,10 +454,7 @@ canvas#game {
     gap: 8px;
   }
 
-  #topbar {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
+  #topbar { flex-wrap: wrap; gap: 6px; }
 
   /* 상태 배지가 먼저 읽히도록 한 줄을 통째로 차지한다 */
   #stateBadge {
@@ -470,15 +470,15 @@ canvas#game {
   #muteBtn {
     margin-left: 0;
     flex: 1;
-    min-height: 44px;          /* 손가락으로 누를 수 있는 최소 높이 */
+    min-height: 44px;
     font-size: 12px;
   }
 
-  /* 오버레이 버튼도 터치 크기로 키운다 */
+  #pauseBtn { display: block; flex: none; }
+
   .btn { padding: .8em 1.9em; font-size: clamp(16px, 4.2vw, 22px); }
   #titleBtns { gap: 10px; }
 
-  /* 상점 카드 5장을 좁은 화면에서는 두 줄로 접는다 */
   #shop { position: fixed; inset: 8px; z-index: 20; container-type: normal; padding: 14px; }
   #skinList { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   #shopHead h2 { font-size: 18px; }
@@ -490,37 +490,35 @@ canvas#game {
   #footer { font-size: 11px; }
 }
 
-/* 아주 좁은 화면 */
 @media (max-width: 420px) {
   /* 4개가 3+1로 흩어지지 않도록 2x2로 딱 떨어뜨린다 */
-  .slot, #muteBtn { flex: 1 1 calc(50% - 3px); }
+  .slot { flex: 1 1 calc(50% - 3px); }
+  #muteBtn { flex: 1 1 calc(60% - 3px); }
 
   #skinList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #pad { width: min(280px, 86vw); gap: 8px; }
-  .padBtn { min-width: 58px; height: clamp(50px, 7.6vh, 66px); font-size: 22px; }
 }
 
-/* 가로로 눕힌 휴대폰 — 화면이 납작하므로 조작부를 캔버스 옆으로 뺀다 */
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
-  #wrap { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "top top" "stage pad" "foot foot"; align-items: center; }
-  #topbar { grid-area: top; }
-  #stage  { grid-area: stage; }
-  #pad    { grid-area: pad; width: 190px; margin: 0 0 0 10px; gap: 7px; }
-  #footer { grid-area: foot; }
-  .padBtn { min-width: 54px; height: clamp(44px, 15vh, 58px); font-size: 20px; }
-  #stateBadge { width: auto; order: 0; }
-}
+/*
+ * 가로로 눕힌 휴대폰 — 세로가 짧다. 이때는 폭이 아니라 남은 높이에서
+ * 캔버스 크기를 거꾸로 계산해야 한다. 폭 기준으로 두면 16:9 캔버스가
+ * 화면보다 길어져 스크롤이 생긴다.
+ *
+ * pointer: coarse를 조건에 넣지 않는다. 세로가 짧은 창은 데스크톱에서도
+ * 같은 문제를 겪고, 해법도 같기 때문이다.
+ */
+@media (orientation: landscape) and (max-height: 620px) {
+  body { padding: 5px 8px; overflow: hidden; align-items: center; }
+  #wrap { gap: 5px; width: min(100%, calc((100vh - 56px) * 16 / 9)); }
 
-/* 스와이프가 페이지 스크롤로 새지 않게 한다 */
-canvas#game { touch-action: none; }
+  #topbar { flex-wrap: nowrap; gap: 5px; }
+  #stateBadge { order: 0; width: auto; font-size: 11px; padding: 6px 10px; }
+  .slot { flex: none; font-size: 10px; padding: 5px 8px; }
+  #muteBtn { margin-left: auto; flex: none; min-height: 34px; font-size: 10px; padding: 5px 9px; }
+  #pauseBtn { display: block; min-height: 34px; min-width: 38px; font-size: 11px; padding: 5px 9px; }
 
-/* 방향 입력이 통하지 않는 상태에서는 방향키를 죽이고, 가운데 버튼만 살려둔다 */
-#pad.idle .padBtn[data-dir] {
-  opacity: .3;
-  pointer-events: none;
-}
-#pad.idle .padBtn.mid {
-  color: #b9ff5a;
-  border-color: rgba(185, 255, 90, .55);
-  box-shadow: 0 0 16px rgba(185, 255, 90, .3), 0 4px 0 rgba(6, 48, 28, .9);
+  #footer { display: none; }   /* 힌트보다 캔버스 높이가 중요하다 */
+
+  /* 상점도 같은 이유로 납작해진다 — 카드를 5열로 되돌린다 */
+  #skinList { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .btn { font-size: clamp(14px, 3vh, 20px); padding: .7em 1.7em; }
 }

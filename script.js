@@ -402,6 +402,13 @@
 
   var FONT = '"Trebuchet MS", "Malgun Gothic", "Segoe UI", sans-serif';
 
+  // 시작 화면 좌하단에 붙는 규칙 요약. 가운데 버튼과 겹치지 않도록 짧게 끊는다.
+  var RULES = [
+    '· 쥐를 먹으면 몸이 길어지고 Mice +1',
+    '· 벽이나 자기 몸에 닿으면 패배',
+    '· 길이 400을 채우면 승리'
+  ];
+
   var DIRS = {
     up:    { x:  0, y: -1 },
     down:  { x:  0, y:  1 },
@@ -536,7 +543,7 @@
   var skinListEl = document.getElementById('skinList');
   var stateBadge = document.getElementById('stateBadge');
   var stateTextEl = document.getElementById('stateText');
-  var padEl = document.getElementById('pad');
+  var pauseBtn = document.getElementById('pauseBtn');
 
   /* ------------------------------------------------------------- 상태 */
 
@@ -1096,9 +1103,12 @@
     stateBadge.className = 'state-' + state;
     stateTextEl.textContent = STATE_LABEL[state] || state;
     // 방향 조작이 의미 있는 상태에서만 방향키를 살린다
-    var live = (state === 'playing' || state === 'countdown');
-    padEl.classList.toggle('idle', !live);
-    renderMidBtn();
+    // 일시정지가 의미 있는 상태에서만 버튼을 살린다
+    var pausable = (state === 'playing' || state === 'paused');
+    pauseBtn.disabled = !pausable;
+    pauseBtn.style.opacity = pausable ? '' : '.35';
+    pauseBtn.textContent = (state === 'paused') ? '▶' : '❚❚';
+    pauseBtn.setAttribute('aria-label', state === 'paused' ? '계속하기' : '일시정지');
   }
 
   function goTitle() {
@@ -1207,7 +1217,7 @@
     for (var y = 1; y < ROWS; y++) { ctx.moveTo(0, y * TILE + 0.5); ctx.lineTo(W, y * TILE + 0.5); }
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(57,255,136,0.28)';
+    ctx.strokeStyle = 'rgba(124,179,66,0.24)';
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, W - 2, H - 2);
   }
@@ -1241,7 +1251,7 @@
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
 
-    ctx.strokeStyle = '#e79cae';
+    ctx.strokeStyle = '#cf94a0';
     ctx.lineWidth = s * 0.055;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -1253,7 +1263,7 @@
     ctx.beginPath(); ctx.arc(s * 0.06, -s * 0.17, s * 0.115, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
-    ctx.fillStyle = '#ff9fb2';
+    ctx.fillStyle = '#e0919e';
     ctx.beginPath(); ctx.arc(s * 0.07, -s * 0.16, s * 0.058, 0, Math.PI * 2); ctx.fill();
 
     ctx.shadowColor = 'rgba(20,10,14,0.6)';
@@ -1265,7 +1275,7 @@
 
     ctx.fillStyle = '#161b22';
     ctx.beginPath(); ctx.arc(s * 0.20, s * 0.015, s * 0.035, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff6f8b';
+    ctx.fillStyle = '#cf7f8c';
     ctx.beginPath(); ctx.arc(s * 0.335, s * 0.085, s * 0.033, 0, Math.PI * 2); ctx.fill();
 
     ctx.strokeStyle = 'rgba(255,240,245,0.85)';
@@ -1284,9 +1294,20 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (glowColor !== 'none') {
-      ctx.shadowColor = glowColor || 'rgba(57,255,136,0.75)';
+      ctx.shadowColor = glowColor || 'rgba(124,179,66,0.45)';
       ctx.shadowBlur = size * 0.5;
     }
+    ctx.fillStyle = color;
+    ctx.fillText(str, x, y);
+    ctx.restore();
+  }
+
+  // 규칙 안내처럼 왼쪽에 붙여 여러 줄을 쌓을 때 쓴다
+  function textLeft(str, x, y, size, color) {
+    ctx.save();
+    ctx.font = size + 'px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = color;
     ctx.fillText(str, x, y);
     ctx.restore();
@@ -1321,16 +1342,16 @@
       tokenFont(tokens[i], size);
       w = widths[i];
       if (tokens[i].key) {
-        ctx.fillStyle = 'rgba(6,20,12,0.65)';
-        ctx.strokeStyle = 'rgba(57,255,136,0.45)';
+        ctx.fillStyle = 'rgba(16,28,18,0.7)';
+        ctx.strokeStyle = 'rgba(124,179,66,0.42)';
         ctx.lineWidth = 1.5;
         rrectOn(ctx, x, y - badgeH / 2, w, badgeH, size * 0.32);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = 'rgba(215,255,232,0.94)';
+        ctx.fillStyle = 'rgba(226,238,214,0.94)';
         ctx.fillText(tokens[i].key, x + w / 2, y + 1);
       } else {
-        ctx.fillStyle = 'rgba(210,255,230,0.62)';
+        ctx.fillStyle = 'rgba(206,224,196,0.6)';
         ctx.fillText(tokens[i].text, x + w / 2, y + 1);
       }
       x += w + gap;
@@ -1376,7 +1397,7 @@
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.shadowBlur = blur || 0;
-      ctx.shadowColor = blur ? 'rgba(57,255,136,0.85)' : 'transparent';
+      ctx.shadowColor = blur ? 'rgba(124,179,66,0.5)' : 'transparent';
       ctx.setLineDash(dash || []);
       ctx.beginPath();
       for (var k = 0; k < strokes.length; k++) {
@@ -1388,29 +1409,29 @@
       ctx.setLineDash([]);
     }
 
-    strokeAll('#04160c', w + 10, 0);
-    strokeAll('#0f7f4a', w + 4, 0);
-    strokeAll('#39ff88', w, 22);
-    strokeAll('rgba(205,255,195,0.45)', w * 0.34, 0, [s * 0.34, s * 0.5]);
+    strokeAll('#0d1a0d', w + 10, 0);
+    strokeAll('#3f6b2e', w + 4, 0);
+    strokeAll('#7cb342', w, 14);
+    strokeAll('rgba(214,232,180,0.38)', w * 0.34, 0, [s * 0.34, s * 0.5]);
 
     var head = strokes[0][0];
     var hx = head[0] + s * 0.18, hy = head[1] - s * 0.20;
 
-    ctx.shadowColor = 'rgba(57,255,136,0.9)';
+    ctx.shadowColor = 'rgba(124,179,66,0.5)';
     ctx.shadowBlur = 24;
-    ctx.fillStyle = '#b9ff5a';
+    ctx.fillStyle = '#a8cc6a';
     ctx.beginPath();
     ctx.ellipse(hx, hy, w * 0.80, w * 0.66, -0.55, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#06130a';
+    ctx.fillStyle = '#111c0e';
     ctx.beginPath(); ctx.arc(hx + s * 0.26, hy - s * 0.22, w * 0.15, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(hx - s * 0.06, hy - s * 0.34, w * 0.13, 0, Math.PI * 2); ctx.fill();
 
     var flick = (Math.sin(now / 240) > 0.72) ? 1 : 0.4;
     var tx = hx + s * 0.62, ty = hy - s * 0.46;
-    ctx.strokeStyle = '#ff4d6d';
+    ctx.strokeStyle = '#c4553f';
     ctx.lineWidth = Math.max(2, s * 0.09);
     ctx.beginPath();
     ctx.moveTo(hx + s * 0.34, hy - s * 0.22);
@@ -1425,8 +1446,8 @@
 
     ctx.translate(tp[0], tp[1]);
     ctx.rotate(ang);
-    ctx.fillStyle = '#0f9d58';
-    ctx.shadowColor = 'rgba(57,255,136,0.7)';
+    ctx.fillStyle = '#5c8a3f';
+    ctx.shadowColor = 'rgba(124,179,66,0.42)';
     ctx.shadowBlur = 14;
     ctx.beginPath();
     ctx.moveTo(0, -w * 0.5);
@@ -1441,7 +1462,7 @@
   /* --------------------------------------------------------- draw() */
 
   function veil(a) {
-    ctx.fillStyle = 'rgba(6,10,7,' + a + ')';
+    ctx.fillStyle = 'rgba(10,16,11,' + a + ')';
     ctx.fillRect(0, 0, W, H);
   }
 
@@ -1466,10 +1487,10 @@
       ctx.font = 'bold 15px ' + FONT;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'rgba(220,255,235,0.85)';
+      ctx.fillStyle = 'rgba(226,238,214,0.85)';
       ctx.fillText(sk.ko, 14, yc - 10);
       ctx.font = 'italic 12px ' + FONT;
-      ctx.fillStyle = 'rgba(200,255,225,0.45)';
+      ctx.fillStyle = 'rgba(206,224,196,0.45)';
       ctx.fillText(sk.sci, 14, yc + 8);
       ctx.restore();
     }
@@ -1483,17 +1504,26 @@
     if (state === 'title') {
       drawSnake(wander.cells, 0.5, wander.dir);
       veil(0.5);
-      drawLogo(W / 2, H * 0.30, 27);
+      drawLogo(W / 2, H * 0.26, 27);
 
-      drawKeys(W / 2, H * 0.565, [
+      drawKeys(W / 2, H * 0.47, [
         { key: 'W' }, { key: 'A' }, { key: 'S' }, { key: 'D' }, { text: '/' },
         { key: '←' }, { key: '↑' }, { key: '↓' }, { key: '→' }, { text: '  이동' }
-      ], 19);
+      ], 18);
 
-      drawKeys(W / 2, H * 0.675, [
+      drawKeys(W / 2, H * 0.565, [
+        { text: '모바일 환경: 이동 방향으로 스와이프' }
+      ], 18);
+
+      drawKeys(W / 2, H * 0.66, [
         { key: 'ESC' }, { text: '  일시정지' }, { text: '  ' },
         { key: 'M' }, { text: '  배경음악 음량 (Mute · 1 · 2 · 3)' }
-      ], 19);
+      ], 18);
+
+      // 규칙은 좌하단에 붙인다 — 가운데는 시작/상점 버튼 자리다
+      RULES.forEach(function (line, i) {
+        textLeft(line, W * 0.036, H * (0.775 + i * 0.065), 14, 'rgba(206, 224, 196, 0.5)');
+      });
 
     } else {
       if (food) drawMouse(food);
@@ -1504,34 +1534,34 @@
         var label = COUNTDOWN[Math.min(countdownIdx, COUNTDOWN.length - 1)];
         var p = countdownAcc / COUNT_MS;
         text(label, W / 2, H * 0.45, 150 - p * 28,
-             label === 'Go!' ? '#b9ff5a' : '#e8fff3');
+             label === 'Go!' ? '#a8cc6a' : '#e7efe1');
 
       } else if (state === 'paused') {
         veil(0.68);
-        text('PAUSED', W / 2, H * 0.42, 86, '#e8fff3');
+        text('PAUSED', W / 2, H * 0.42, 86, '#e7efe1');
         drawKeys(W / 2, H * 0.58, [{ key: 'ESC' }, { text: '  를 눌러 계속' }], 22);
 
       } else if (state === 'win') {
         veil(0.72);
-        text('You Win!', W / 2, H * 0.32, 96, '#b9ff5a');
+        text('You Win!', W / 2, H * 0.32, 96, '#a8cc6a');
         text('SCORE ' + snake.length, W / 2, H * 0.455, 30,
-             'rgba(210,255,230,0.85)', 'none');
+             'rgba(214,228,200,0.85)', 'none');
         text('Mice +' + earned, W / 2, H * 0.545, 22,
-             'rgba(255,222,150,0.85)', 'none');
+             'rgba(207,161,78,0.92)', 'none');
 
       } else if (state === 'lose') {
         veil(0.72);
-        text('Better Luck Next Time', W / 2, H * 0.32, 60, '#ff6b81',
-             'rgba(255,59,92,0.75)');
+        text('Better Luck Next Time', W / 2, H * 0.32, 60, '#c4553f',
+             'rgba(196,85,63,0.55)');
         text('SCORE ' + snake.length + '   ·   승리까지 ' + Math.max(0, WIN_LEN - snake.length) + ' 남았습니다',
-             W / 2, H * 0.455, 24, 'rgba(255,215,222,0.8)', 'none');
+             W / 2, H * 0.455, 24, 'rgba(226,200,190,0.8)', 'none');
         text('Mice +' + earned, W / 2, H * 0.545, 22,
-             'rgba(255,222,150,0.85)', 'none');
+             'rgba(207,161,78,0.92)', 'none');
       }
     }
 
     if (flash > 0) {
-      ctx.fillStyle = 'rgba(230,255,200,' + (flash * 0.09) + ')';
+      ctx.fillStyle = 'rgba(216,232,186,' + (flash * 0.09) + ')';
       ctx.fillRect(0, 0, W, H);
     }
   }
@@ -1733,6 +1763,10 @@
     if (state === 'playing' && e.key === '`') { debugGrow(50); return; }
 
     if (e.key === ' ' || e.key === 'Enter') {
+      // 버튼에 초점이 있으면 브라우저가 이미 click을 쏜다. 여기서 또 처리하면
+      // 같은 입력이 두 번 먹으므로 비켜준다.
+      var focused = document.activeElement;
+      if (focused && focused.tagName === 'BUTTON') return;
       if (state === 'title') { e.preventDefault(); startGame(); return; }
       if (state === 'win' || state === 'lose') { e.preventDefault(); goTitle(); return; }
     }
@@ -1752,78 +1786,61 @@
   homeBtn.addEventListener('click', function () { wake(); goTitle(); });
   muteBtn.addEventListener('click', function () { wake(); cycleBgm(); });
 
-  /* --------------------------------------------------- 터치 조작부 */
-
-  /*
-   * click 대신 pointerdown으로 받는다. 모바일 브라우저의 click은 300ms 가까이
-   * 늦게 오는 경우가 있어, 빠른 구간에서 한 칸씩 밀리기 때문이다.
-   */
-  Array.prototype.forEach.call(padEl.querySelectorAll('.padBtn'), function (btn) {
-    btn.addEventListener('pointerdown', function (e) {
-      e.preventDefault();
-      wake();
-
-      var d = btn.getAttribute('data-dir');
-      if (d) { turn(d); }
-      else { midAction(); }
-
-      btn.classList.add('on');
-      setTimeout(function () { btn.classList.remove('on'); }, 110);
-    });
-    // 길게 눌렀을 때 뜨는 컨텍스트 메뉴와 텍스트 선택을 막는다
-    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-  });
-
-  // 가운데 버튼은 상태에 따라 할 일이 달라진다 — 엄지가 닿는 자리를 놀리지 않는다.
-  function midAction() {
-    if (state === 'title') startGame();
-    else if (state === 'win' || state === 'lose') goTitle();
-    else togglePause();
-  }
-
-  var MID_LABEL = {
-    title:     { icon: '▶',  label: '시작' },
-    countdown: { icon: '❚❚', label: '일시정지' },
-    playing:   { icon: '❚❚', label: '일시정지' },
-    paused:    { icon: '▶',  label: '계속하기' },
-    // win/lose 모두 타이틀로 돌아간다 — 곧바로 재시작하지 않으므로 문구도 그렇게 적는다
-    win:       { icon: '↺',  label: '처음으로' },
-    lose:      { icon: '↺',  label: '처음으로' }
-  };
-
-  var midBtn = padEl.querySelector('.padBtn.mid');
-
-  function renderMidBtn() {
-    var m = MID_LABEL[state] || MID_LABEL.title;
-    midBtn.textContent = m.icon;
-    midBtn.setAttribute('aria-label', m.label);
-    midBtn.setAttribute('title', m.label);
-  }
+  pauseBtn.addEventListener('click', function () { wake(); togglePause(); });
 
   /* ------------------------------------------------------ 스와이프 */
 
   /*
-   * 캔버스를 문질러도 방향을 바꿀 수 있게 한다. 24px은 화면을 톡 누른 것과
-   * 밀어낸 것을 가르는 값으로, 이보다 짧으면 흔들린 손가락까지 방향으로 읽힌다.
+   * 모바일 조작은 전부 스와이프다. D패드는 가로모드에서 캔버스가 쓸 수 있는
+   * 폭을 그대로 잡아먹어 걷어냈다.
+   *
+   * pointerup이 아니라 pointermove 도중 24px을 넘기는 순간 방향을 받는다.
+   * 손가락을 떼야 반응하면 다음 이동 타이밍을 놓치기 쉽기 때문이다.
+   * 받은 방향은 turn()이 큐에 넣고, 뱀은 다음 이동 시점에 그 방향으로 꺾인다.
+   * 기준점을 그 자리로 옮겨두므로, 손가락을 떼지 않고 이어서 밀면
+   * 한 번의 제스처 안에서 두 번째 방향까지 넣을 수 있다.
    */
   var SWIPE_MIN = 24;
   var swipe = null;
 
   canvas.addEventListener('pointerdown', function (e) {
-    swipe = { x: e.clientX, y: e.clientY };
+    swipe = { x: e.clientX, y: e.clientY, id: e.pointerId };
   });
 
-  canvas.addEventListener('pointerup', function (e) {
-    if (!swipe) return;
+  canvas.addEventListener('pointermove', function (e) {
+    if (!swipe || e.pointerId !== swipe.id) return;
+
     var dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
-    swipe = null;
     if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) return;
+
     // 더 많이 움직인 축만 남긴다 — 대각선을 두 방향으로 읽지 않기 위해서다
     turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left')
                                      : (dy > 0 ? 'down' : 'up'));
+
+    swipe.x = e.clientX;
+    swipe.y = e.clientY;
   });
 
-  canvas.addEventListener('pointercancel', function () { swipe = null; });
+  function endSwipe() { swipe = null; }
+  canvas.addEventListener('pointerup', endSwipe);
+  canvas.addEventListener('pointercancel', endSwipe);
+  canvas.addEventListener('pointerleave', endSwipe);
+
+  /* --------------------------------------------------- 키보드 초점 */
+
+  /*
+   * TAB을 한 번이라도 누르기 전에는 초점 테두리를 그리지 않는다.
+   * 눌린 뒤부터는 body.kbd가 붙어 CSS가 호박색 테두리를 그린다.
+   * 다시 포인터를 쓰면 떼어내, 마우스 사용자에게는 테두리가 남지 않는다.
+   */
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') document.body.classList.add('kbd');
+  }, true);
+
+  window.addEventListener('pointerdown', function () {
+    document.body.classList.remove('kbd');
+  }, true);
+
 
   /* ------------------------------------------------------------- 기동 */
 
