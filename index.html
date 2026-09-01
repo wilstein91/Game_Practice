@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SNAKE</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="1024" height="576"></canvas>
+
+    <div id="overlay">
+      <button id="startBtn" class="btn">시작!</button>
+      <button id="retryBtn" class="btn hidden">한번더?</button>
+      <button id="homeBtn"  class="btn hidden">메인으로</button>
+    </div>
+
+    <button id="muteBtn" type="button" title="음소거 토글 (M)">🔊</button>
+    <div id="hint">🔊 클릭하면 음악이 재생됩니다</div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

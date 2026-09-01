@@ -1,0 +1,103 @@
+:root {
+  --bg:      #05080b;
+  --neon:    #39ff88;
+  --ink:     #e8fff3;
+  --danger:  #ff3b5c;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 28%, #0d1520 0%, var(--bg) 72%);
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+#stage {
+  position: relative;
+  width: min(96vw, calc((100vh - 32px) * 16 / 9), 1024px);
+  aspect-ratio: 16 / 9;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow:
+    0 0 0 2px rgba(57, 255, 136, .18),
+    0 0 70px rgba(57, 255, 136, .10),
+    0 20px 60px rgba(0, 0, 0, .65);
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 8%;
+  pointer-events: none;
+}
+
+.btn {
+  pointer-events: auto;
+  cursor: pointer;
+  font: 700 clamp(15px, 2.1vw, 25px)/1 "Trebuchet MS", "Segoe UI", sans-serif;
+  letter-spacing: .06em;
+  color: #04160c;
+  background: linear-gradient(180deg, #8affbc, #22c96f);
+  border: 0;
+  border-radius: 999px;
+  padding: .78em 2.3em;
+  box-shadow: 0 0 26px rgba(57, 255, 136, .55), 0 6px 0 #0c6b3c;
+  transition: transform .08s ease, box-shadow .15s ease;
+}
+
+.btn:hover  { box-shadow: 0 0 38px rgba(57, 255, 136, .85), 0 6px 0 #0c6b3c; }
+.btn:active { transform: translateY(4px); box-shadow: 0 0 18px rgba(57, 255, 136, .5), 0 2px 0 #0c6b3c; }
+.btn:focus-visible { outline: 3px solid #b9ff5a; outline-offset: 4px; }
+
+#muteBtn {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--ink);
+  background: rgba(6, 20, 13, .6);
+  border: 1px solid rgba(57, 255, 136, .35);
+  border-radius: 10px;
+  transition: background .15s ease, border-color .15s ease;
+}
+#muteBtn:hover { background: rgba(12, 45, 28, .8); border-color: rgba(57, 255, 136, .7); }
+
+#hint {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  padding: 6px 12px;
+  font-size: clamp(11px, 1.2vw, 14px);
+  color: rgba(200, 255, 225, .75);
+  background: rgba(6, 20, 13, .6);
+  border: 1px solid rgba(57, 255, 136, .25);
+  border-radius: 8px;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+
+.hidden { display: none !important; }
