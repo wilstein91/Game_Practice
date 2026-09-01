@@ -8,7 +8,11 @@ Practicing making a web game with AI
 
 바닐라 HTML / CSS / JavaScript로 만든 스네이크 게임. 외부 라이브러리도, 이미지도, 음원 파일도 없습니다. 뱀·쥐·바닥·로고·음악까지 전부 코드로 그리고 만듭니다.
 
-### 실행
+### 플레이
+
+**https://wilstein91.github.io/Game_Practice/**
+
+### 로컬에서 실행
 
 ```bash
 python -m http.server 8123
