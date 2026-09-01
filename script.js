@@ -1,4 +1,380 @@
 /*
+ * script.js — SNAKE v0.5.1
+ *
+ * v0.5까지 audio.js + game.js로 나뉘어 있던 코드를 한 파일로 합쳤다.
+ *   1부 — 오디오 엔진 (window.Chip)
+ *   2부 — 게임 본체 (window.SNAKE)
+ * Chip이 먼저 정의되어야 게임 본체가 이를 참조할 수 있으므로 순서를 지킨다.
+ */
+
+/* =============================================================== 1부 · 오디오 */
+
+/*
+ * audio.js — 8비트 칩튠 사운드 엔진 (Web Audio API 실시간 합성, 음원 파일 없음)
+ *
+ * 목소리 구성: 펄스파(리드/하모니) + 삼각파(베이스) + 노이즈(퍼커션)
+ * 수록곡은 모두 오리지널 창작곡입니다.
+ */
+(function (global) {
+  'use strict';
+
+  /* ---------------------------------------------------------- 음표 유틸 */
+
+  var SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+  function freq(name) {
+    var m = /^([A-G])([#b]?)(-?\d)$/.exec(name);
+    if (!m) return 0;
+    var s = SEMI[m[1]];
+    if (m[2] === '#') s += 1;
+    else if (m[2] === 'b') s -= 1;
+    var midi = (parseInt(m[3], 10) + 1) * 12 + s;
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  // [['A4', 2], [null, 2], ...] -> 16분음표 스텝 인덱스로 흩뿌린 배열
+  function seq(list) {
+    var out = [], i = 0;
+    for (var k = 0; k < list.length; k++) {
+      var n = list[k][0], d = list[k][1];
+      if (n) out[i] = { f: freq(n), d: d };
+      i += d;
+    }
+    out.length = i;
+    return out;
+  }
+
+  var CHORD = {
+    Am: ['A3', 'C4', 'E4', 'A4'], F:  ['F3', 'A3', 'C4', 'F4'],
+    G:  ['G3', 'B3', 'D4', 'G4'], Em: ['E3', 'G3', 'B3', 'E4'],
+    C:  ['C4', 'E4', 'G4', 'C5'], E:  ['E3', 'G#3', 'B3', 'E4'],
+    Dm: ['D3', 'F3', 'A3', 'D4']
+  };
+
+  // 코드 진행 -> 아르페지오 (unit = 음표 길이, 16분음표 단위)
+  function arp(chords, unit) {
+    var list = [], per = 16 / unit;
+    for (var c = 0; c < chords.length; c++) {
+      var tones = CHORD[chords[c]];
+      for (var i = 0; i < per; i++) list.push([tones[i % tones.length], unit]);
+    }
+    return list;
+  }
+
+  // 루트/5도를 번갈아 밟는 8분음표 베이스 라인
+  function bass(pairs) {
+    var list = [];
+    for (var i = 0; i < pairs.length; i++) {
+      for (var j = 0; j < 4; j++) {
+        list.push([pairs[i][0], 2]);
+        list.push([pairs[i][1], 2]);
+      }
+    }
+    return list;
+  }
+
+  function rep(pattern, times) {
+    var s = '';
+    for (var i = 0; i < times; i++) s += pattern;
+    return s;
+  }
+
+  /* ------------------------------------------------------------- 수록곡 */
+
+  // 게임플레이: A단조 행진곡풍 오버월드 테마 (8마디 루프)
+  var GAME_LEAD = [
+    ['A4', 2], ['A4', 2], ['E5', 2], ['A4', 2], ['C5', 2], ['B4', 2], ['A4', 2], ['G4', 2],
+    ['F4', 2], ['F4', 2], ['C5', 2], ['F4', 2], ['A4', 2], ['G4', 2], ['F4', 2], ['E4', 2],
+    ['G4', 2], ['G4', 2], ['D5', 2], ['G4', 2], ['B4', 2], ['A4', 2], ['G4', 2], ['F4', 2],
+    ['E4', 2], ['G4', 2], ['B4', 2], ['E5', 2], ['D5', 4], ['C5', 4],
+    ['A4', 4], ['C5', 2], ['E5', 2], ['A5', 4], ['G5', 2], ['E5', 2],
+    ['F5', 4], ['E5', 2], ['D5', 2], ['C5', 4], ['B4', 2], ['A4', 2],
+    ['G4', 4], ['B4', 2], ['D5', 2], ['G5', 4], ['F5', 2], ['D5', 2],
+    ['E5', 8], [null, 2], ['D5', 2], ['E5', 4]
+  ];
+  var GAME_CHORDS = ['Am', 'F', 'G', 'Em', 'Am', 'F', 'G', 'E'];
+  var GAME_BASS = [
+    ['A2', 'E3'], ['F2', 'C3'], ['G2', 'D3'], ['E2', 'B2'],
+    ['A2', 'E3'], ['F2', 'C3'], ['G2', 'D3'], ['E2', 'B2']
+  ];
+
+  // 타이틀: 느긋하고 웅장한 어드벤처 테마 (8마디 루프)
+  var TITLE_LEAD = [
+    ['A4', 8], ['C5', 4], ['E5', 4],
+    ['A5', 8], ['G5', 4], ['E5', 4],
+    ['F5', 8], ['E5', 4], ['C5', 4],
+    ['D5', 8], ['C5', 4], ['A4', 4],
+    ['G4', 8], ['B4', 4], ['D5', 4],
+    ['G5', 8], ['F5', 4], ['D5', 4],
+    ['E5', 8], ['C5', 4], ['A4', 4],
+    ['B4', 8], ['E5', 8]
+  ];
+  var TITLE_CHORDS = ['Am', 'Am', 'F', 'F', 'G', 'G', 'Am', 'E'];
+  var TITLE_BASS = [
+    ['A2', 'A3'], ['A2', 'E3'], ['F2', 'F3'], ['F2', 'C3'],
+    ['G2', 'G3'], ['G2', 'D3'], ['A2', 'A3'], ['E2', 'B2']
+  ];
+
+  function song(def) {
+    var len = 0;
+    for (var i = 0; i < def.voices.length; i++) {
+      var v = def.voices[i];
+      var n = (v.kind === 'drum') ? v.pat.length : v.seq.length;
+      if (n > len) len = n;
+    }
+    def.len = len;
+    return def;
+  }
+
+  var SONGS = {
+    title: song({
+      bpm: 96, loop: true, dynamic: false,
+      voices: [
+        { kind: 'lead', gain: 0.170, seq: seq(TITLE_LEAD) },
+        { kind: 'harm', gain: 0.055, seq: seq(arp(TITLE_CHORDS, 2)) },
+        { kind: 'bass', gain: 0.200, seq: seq(bass(TITLE_BASS)) },
+        { kind: 'drum', pat: rep('..h...h...h...h.', 8).split('') }
+      ]
+    }),
+
+    game: song({
+      bpm: 120, loop: true, dynamic: true,
+      voices: [
+        { kind: 'lead', gain: 0.160, seq: seq(GAME_LEAD) },
+        { kind: 'harm', gain: 0.050, seq: seq(arp(GAME_CHORDS, 2)) },
+        { kind: 'bass', gain: 0.210, seq: seq(bass(GAME_BASS)) },
+        { kind: 'drum', pat: (rep('K.h.S.h.K.h.S.h.', 7) + 'K.h.S.h.KSKShShS').split('') }
+      ]
+    }),
+
+    win: song({
+      bpm: 150, loop: false, dynamic: false,
+      voices: [
+        { kind: 'lead', gain: 0.20, seq: seq([['C5', 2], ['E5', 2], ['G5', 2], ['C6', 4], [null, 1], ['G5', 1], ['C6', 8]]) },
+        { kind: 'harm', gain: 0.09, seq: seq([['E4', 2], ['G4', 2], ['C5', 2], ['E5', 4], [null, 2], ['E5', 8]]) },
+        { kind: 'bass', gain: 0.22, seq: seq([['C3', 6], ['G2', 6], ['C3', 8]]) }
+      ]
+    }),
+
+    lose: song({
+      bpm: 104, loop: false, dynamic: false,
+      voices: [
+        { kind: 'lead', gain: 0.19, seq: seq([['A4', 3], ['G4', 3], ['F4', 3], ['E4', 5], [null, 2], ['D4', 3], ['A3', 8]]) },
+        { kind: 'bass', gain: 0.22, seq: seq([['A2', 6], ['F2', 6], ['D2', 7], ['A2', 8]]) }
+      ]
+    })
+  };
+
+  /* --------------------------------------------------------- 오디오 엔진 */
+
+  var ctx = null, master = null, noiseBuf = null;
+  var cur = null, stepIdx = 0, nextTime = 0, pending = null;
+  var tempoMul = 1;
+  var paused = false;
+
+  // 배경음악 음량: 0 = Mute, 1 ~ 3 단계
+  var LEVELS = [0, 0.14, 0.26, 0.40];
+  var level = 2;
+  try {
+    var stored = global.localStorage.getItem('snake.bgm');
+    if (stored !== null) level = Math.max(0, Math.min(3, parseInt(stored, 10) || 0));
+    else if (global.localStorage.getItem('snake.muted') === '1') level = 0;   // 예전 설정 이관
+  } catch (e) {}
+
+  function makeNoise() {
+    var len = Math.floor(ctx.sampleRate * 0.4);
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  // 브라우저 자동재생 정책상 사용자 조작 이후에만 소리를 낼 수 있다.
+  function unlock() {
+    if (!ctx) {
+      var AC = global.AudioContext || global.webkitAudioContext;
+      if (!AC) return false;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = LEVELS[level];
+      master.connect(ctx.destination);
+      noiseBuf = makeNoise();
+      global.setInterval(schedule, 25);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    if (pending) { var p = pending; pending = null; play(p); }
+    return true;
+  }
+
+  function tone(kind, t, f, dur, gain) {
+    var o = ctx.createOscillator();
+    o.type = (kind === 'bass') ? 'triangle' : 'square';
+    o.frequency.setValueAtTime(f, t);
+
+    var g = ctx.createGain();
+    var attack = Math.min(0.008, dur * 0.1);
+    var hold = dur * 0.70;
+    var rel = dur * 0.97;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + attack);
+    g.gain.setValueAtTime(gain, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + rel);
+
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+
+  function kick(t) {
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.42, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.16);
+  }
+
+  function noiseHit(t, dur, gain, hp) {
+    var src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    var f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = hp;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.02);
+  }
+
+  // 미리보기 스케줄러: 25ms마다 깨어나 150ms 앞까지 음을 예약한다.
+  function schedule() {
+    if (!cur || !ctx || paused) return;
+    var horizon = ctx.currentTime + 0.15;
+    var guard = 0;
+    while (nextTime < horizon && guard++ < 300) {
+      var mul = cur.dynamic ? tempoMul : 1;
+      var spb = 15 / (cur.bpm * mul);   // 60 / bpm / 4 = 16분음표 한 스텝(초)
+      emit(cur, stepIdx, nextTime, spb);
+      stepIdx++;
+      nextTime += spb;
+      if (stepIdx >= cur.len) {
+        if (cur.loop) stepIdx = 0;
+        else { cur = null; return; }
+      }
+    }
+  }
+
+  function emit(s, i, t, spb) {
+    for (var v = 0; v < s.voices.length; v++) {
+      var voice = s.voices[v];
+      if (voice.kind === 'drum') {
+        var c = voice.pat[i % voice.pat.length];
+        if (c === 'K') kick(t);
+        else if (c === 'S') noiseHit(t, 0.13, 0.20, 1400);
+        else if (c === 'h') noiseHit(t, 0.035, 0.075, 6500);
+      } else {
+        var ev = voice.seq[i];
+        if (ev) tone(voice.kind, t, ev.f, ev.d * spb, voice.gain);
+      }
+    }
+  }
+
+  function play(name) {
+    var s = SONGS[name];
+    if (!s) return;
+    if (!ctx) { pending = name; return; }
+    cur = s;
+    stepIdx = 0;
+    nextTime = ctx.currentTime + 0.06;
+  }
+
+  function stop() { cur = null; pending = null; }
+
+  // 뱀 속도(0 = 시작, 1 = 최고속)에 맞춰 게임 음악 템포를 끌어올린다.
+  function setIntensity(x) {
+    x = Math.max(0, Math.min(1, x || 0));
+    tempoMul = 0.85 + x * 0.9;          // 120bpm 기준 102 ~ 210bpm
+  }
+
+  // 주파수를 훑고 지나가는 짧은 울음소리
+  function chirp(t, f0, f1, dur, gain) {
+    var o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.8, t + dur);
+
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.01);
+  }
+
+  function sfx(name) {
+    if (!ctx || level === 0 || paused) return;
+    var t = ctx.currentTime + 0.001;
+
+    if (name === 'eat') {
+      tone('lead', t, freq('E5'), 0.055, 0.16);
+      tone('lead', t + 0.055, freq('B5'), 0.075, 0.16);
+
+    } else if (name === 'squeak') {
+      // 쥐가 나타날 때 "찍찍" — 아주 작게
+      chirp(t, 1850, 3250, 0.05, 0.042);
+      chirp(t + 0.082, 2050, 3550, 0.045, 0.036);
+    }
+  }
+
+  function applyGain(ramp) {
+    if (!master) return;
+    master.gain.setTargetAtTime(paused ? 0 : LEVELS[level], ctx.currentTime, ramp);
+  }
+
+  function setLevel(n) {
+    level = Math.max(0, Math.min(LEVELS.length - 1, n | 0));
+    applyGain(0.02);
+    try { global.localStorage.setItem('snake.bgm', String(level)); } catch (e) {}
+    return level;
+  }
+
+  // Mute -> 1 -> 2 -> 3 -> Mute
+  function cycleLevel() { return setLevel((level + 1) % LEVELS.length); }
+
+  // 일시정지: 재생 위치를 유지한 채 스케줄러만 멈춘다.
+  function setPaused(v) {
+    v = !!v;
+    if (v === paused) return;
+    paused = v;
+    applyGain(0.05);
+    if (!paused && ctx) nextTime = ctx.currentTime + 0.06;
+  }
+
+  global.Chip = {
+    unlock: unlock,
+    ready: function () { return !!ctx && ctx.state === 'running'; },
+    play: play,
+    stop: stop,
+    sfx: sfx,
+    setIntensity: setIntensity,
+    tempo: function () { return { mul: tempoMul, bpm: cur ? Math.round(cur.bpm * (cur.dynamic ? tempoMul : 1)) : null }; },
+    isMuted: function () { return level === 0; },
+    level: function () { return level; },
+    maxLevel: LEVELS.length - 1,
+    setLevel: setLevel,
+    cycleLevel: cycleLevel,
+    setPaused: setPaused
+  };
+})(window);
+
+/* =============================================================== 2부 · 게임 */
+
+/*
  * game.js — SNAKE
  *
  * 32 x 18 그리드, 시작 길이 5, 길이 400 달성 시 승리.
@@ -158,10 +534,26 @@
   var shopMiceEl = document.getElementById('shopSilver');
   var shopCloseBtn = document.getElementById('shopClose');
   var skinListEl = document.getElementById('skinList');
+  var stateBadge = document.getElementById('stateBadge');
+  var stateTextEl = document.getElementById('stateText');
+  var padEl = document.getElementById('pad');
 
   /* ------------------------------------------------------------- 상태 */
 
   var state = 'title';          // title | countdown | playing | paused | win | lose
+
+  /*
+   * 상태 배지에 쓸 문구. 색은 styles.css의 .state-* 가 맡고, 문구는 여기가 맡는다.
+   * 둘을 항상 같이 바꾸므로 색을 구분하지 못해도 문구만으로 상태를 알 수 있다.
+   */
+  var STATE_LABEL = {
+    title:     '대기 중',
+    countdown: '준비!',
+    playing:   '진행 중',
+    paused:    '일시정지',
+    win:       '승리!',
+    lose:      '게임 오버'
+  };
   var snake, dir, queue, food, eaten = 0, earned = 0, nextSeq = 0;
   var moveMs, moveAcc;
   var countdownIdx, countdownAcc;
@@ -695,7 +1087,18 @@
     retryBtn.classList.toggle('hidden', s !== 'lose');
     homeBtn.classList.toggle('hidden', s !== 'win');
     if (s !== 'title') closeShop();
+    renderBadge();
     renderHud();
+  }
+
+  // 색(클래스)과 문구를 한 함수 안에서 같이 갈아끼워, 둘이 어긋날 여지를 없앤다.
+  function renderBadge() {
+    stateBadge.className = 'state-' + state;
+    stateTextEl.textContent = STATE_LABEL[state] || state;
+    // 방향 조작이 의미 있는 상태에서만 방향키를 살린다
+    var live = (state === 'playing' || state === 'countdown');
+    padEl.classList.toggle('idle', !live);
+    renderMidBtn();
   }
 
   function goTitle() {
@@ -1295,6 +1698,21 @@
     win();
   }
 
+  /* ------------------------------------------------------------ 입력 */
+
+  /*
+   * 방향 입력의 단일 창구. 키보드와 터치가 같은 규칙을 타도록 한 곳에 모았다.
+   * 진행 방향의 정반대 입력은 자기 목을 무는 즉사로 이어지므로 버린다.
+   */
+  function turn(d) {
+    if (state !== 'playing') return false;
+    var lastDir = queue.length ? queue[queue.length - 1] : dir;
+    if (d === lastDir || d === OPP[lastDir]) return false;
+    if (queue.length >= 2) return false;
+    queue.push(d);
+    return true;
+  }
+
   window.addEventListener('keydown', function (e) {
     wake();
 
@@ -1322,12 +1740,7 @@
     var d = KEYMAP[e.key];
     if (!d) return;
     e.preventDefault();
-    if (state !== 'playing') return;
-
-    // 진행 방향의 정반대 입력은 즉사로 이어지므로 무시한다.
-    var lastDir = queue.length ? queue[queue.length - 1] : dir;
-    if (d === lastDir || d === OPP[lastDir]) return;
-    if (queue.length < 2) queue.push(d);
+    turn(d);
   });
 
   window.addEventListener('pointerdown', wake);
@@ -1338,6 +1751,79 @@
   retryBtn.addEventListener('click', function () { wake(); goTitle(); });
   homeBtn.addEventListener('click', function () { wake(); goTitle(); });
   muteBtn.addEventListener('click', function () { wake(); cycleBgm(); });
+
+  /* --------------------------------------------------- 터치 조작부 */
+
+  /*
+   * click 대신 pointerdown으로 받는다. 모바일 브라우저의 click은 300ms 가까이
+   * 늦게 오는 경우가 있어, 빠른 구간에서 한 칸씩 밀리기 때문이다.
+   */
+  Array.prototype.forEach.call(padEl.querySelectorAll('.padBtn'), function (btn) {
+    btn.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      wake();
+
+      var d = btn.getAttribute('data-dir');
+      if (d) { turn(d); }
+      else { midAction(); }
+
+      btn.classList.add('on');
+      setTimeout(function () { btn.classList.remove('on'); }, 110);
+    });
+    // 길게 눌렀을 때 뜨는 컨텍스트 메뉴와 텍스트 선택을 막는다
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  });
+
+  // 가운데 버튼은 상태에 따라 할 일이 달라진다 — 엄지가 닿는 자리를 놀리지 않는다.
+  function midAction() {
+    if (state === 'title') startGame();
+    else if (state === 'win' || state === 'lose') goTitle();
+    else togglePause();
+  }
+
+  var MID_LABEL = {
+    title:     { icon: '▶',  label: '시작' },
+    countdown: { icon: '❚❚', label: '일시정지' },
+    playing:   { icon: '❚❚', label: '일시정지' },
+    paused:    { icon: '▶',  label: '계속하기' },
+    // win/lose 모두 타이틀로 돌아간다 — 곧바로 재시작하지 않으므로 문구도 그렇게 적는다
+    win:       { icon: '↺',  label: '처음으로' },
+    lose:      { icon: '↺',  label: '처음으로' }
+  };
+
+  var midBtn = padEl.querySelector('.padBtn.mid');
+
+  function renderMidBtn() {
+    var m = MID_LABEL[state] || MID_LABEL.title;
+    midBtn.textContent = m.icon;
+    midBtn.setAttribute('aria-label', m.label);
+    midBtn.setAttribute('title', m.label);
+  }
+
+  /* ------------------------------------------------------ 스와이프 */
+
+  /*
+   * 캔버스를 문질러도 방향을 바꿀 수 있게 한다. 24px은 화면을 톡 누른 것과
+   * 밀어낸 것을 가르는 값으로, 이보다 짧으면 흔들린 손가락까지 방향으로 읽힌다.
+   */
+  var SWIPE_MIN = 24;
+  var swipe = null;
+
+  canvas.addEventListener('pointerdown', function (e) {
+    swipe = { x: e.clientX, y: e.clientY };
+  });
+
+  canvas.addEventListener('pointerup', function (e) {
+    if (!swipe) return;
+    var dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) return;
+    // 더 많이 움직인 축만 남긴다 — 대각선을 두 방향으로 읽지 않기 위해서다
+    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left')
+                                     : (dy > 0 ? 'down' : 'up'));
+  });
+
+  canvas.addEventListener('pointercancel', function () { swipe = null; });
 
   /* ------------------------------------------------------------- 기동 */
 
