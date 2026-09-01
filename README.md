@@ -10,7 +10,7 @@ Practicing making a web game with AI
 
 ### 플레이
 
-**https://wilstein91.github.io/Game_Practice/**
+**https://wilstein91.github.io/Game_Practice**
 
 ### 로컬에서 실행
 
