@@ -2,18 +2,25 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1310">
 <title>SNAKE</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="wrap">
 
     <div id="topbar">
+      <!-- 상태 배지: 점 색깔과 문구가 항상 함께 바뀐다 (색만으로 구분하지 않는다) -->
+      <div id="stateBadge" class="state-title" role="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span id="stateText">대기 중</span>
+      </div>
       <div class="slot" id="hiScore">HI-SCORE <b>0</b></div>
       <div class="slot" id="silverSlot">🐭 Mice <b>0</b></div>
       <div class="slot" id="toWin">승리까지 <b>395</b></div>
       <button id="muteBtn" type="button" title="배경음악 음량: Mute · 1 · 2 · 3 (M)">🔊 BGM 2</button>
+      <!-- D패드를 걷어낸 대신 터치 환경의 일시정지 창구. 데스크톱은 ESC가 있으므로 숨긴다 -->
+      <button id="pauseBtn" type="button" title="일시정지 / 계속">❚❚</button>
     </div>
 
     <div id="stage">
@@ -35,15 +42,17 @@
           <button id="shopClose" type="button" title="닫기 (ESC)">✕</button>
         </div>
         <div id="skinList"></div>
-        <p id="shopNote">쥐를 한 마리 먹을 때마다 <b>Mice 1</b>이 쌓입니다. 이기든 지든 그 판에서 먹은 만큼 지급됩니다.</p>
+        <p id="shopNote">게임 내에서 쥐를 한 마리 먹을 때마다 <b>Mice 1</b>이 쌓입니다.</p>
       </div>
     </div>
 
-    <div id="footer"><span id="hint">🔊 화면을 한 번 클릭하면 배경음악이 재생됩니다</span></div>
+    <div id="footer">
+      <span id="rotateHint">📱 가로로 돌리면 화면을 더 크게 씁니다</span>
+      <span id="hint">🔊 화면을 한 번 클릭하면 배경음악이 재생됩니다</span>
+    </div>
 
   </div>
 
-  <script src="audio.js"></script>
-  <script src="game.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

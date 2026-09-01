@@ -1,4 +1,380 @@
 /*
+ * script.js — SNAKE v0.5.1
+ *
+ * v0.5까지 audio.js + game.js로 나뉘어 있던 코드를 한 파일로 합쳤다.
+ *   1부 — 오디오 엔진 (window.Chip)
+ *   2부 — 게임 본체 (window.SNAKE)
+ * Chip이 먼저 정의되어야 게임 본체가 이를 참조할 수 있으므로 순서를 지킨다.
+ */
+
+/* =============================================================== 1부 · 오디오 */
+
+/*
+ * audio.js — 8비트 칩튠 사운드 엔진 (Web Audio API 실시간 합성, 음원 파일 없음)
+ *
+ * 목소리 구성: 펄스파(리드/하모니) + 삼각파(베이스) + 노이즈(퍼커션)
+ * 수록곡은 모두 오리지널 창작곡입니다.
+ */
+(function (global) {
+  'use strict';
+
+  /* ---------------------------------------------------------- 음표 유틸 */
+
+  var SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+  function freq(name) {
+    var m = /^([A-G])([#b]?)(-?\d)$/.exec(name);
+    if (!m) return 0;
+    var s = SEMI[m[1]];
+    if (m[2] === '#') s += 1;
+    else if (m[2] === 'b') s -= 1;
+    var midi = (parseInt(m[3], 10) + 1) * 12 + s;
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  // [['A4', 2], [null, 2], ...] -> 16분음표 스텝 인덱스로 흩뿌린 배열
+  function seq(list) {
+    var out = [], i = 0;
+    for (var k = 0; k < list.length; k++) {
+      var n = list[k][0], d = list[k][1];
+      if (n) out[i] = { f: freq(n), d: d };
+      i += d;
+    }
+    out.length = i;
+    return out;
+  }
+
+  var CHORD = {
+    Am: ['A3', 'C4', 'E4', 'A4'], F:  ['F3', 'A3', 'C4', 'F4'],
+    G:  ['G3', 'B3', 'D4', 'G4'], Em: ['E3', 'G3', 'B3', 'E4'],
+    C:  ['C4', 'E4', 'G4', 'C5'], E:  ['E3', 'G#3', 'B3', 'E4'],
+    Dm: ['D3', 'F3', 'A3', 'D4']
+  };
+
+  // 코드 진행 -> 아르페지오 (unit = 음표 길이, 16분음표 단위)
+  function arp(chords, unit) {
+    var list = [], per = 16 / unit;
+    for (var c = 0; c < chords.length; c++) {
+      var tones = CHORD[chords[c]];
+      for (var i = 0; i < per; i++) list.push([tones[i % tones.length], unit]);
+    }
+    return list;
+  }
+
+  // 루트/5도를 번갈아 밟는 8분음표 베이스 라인
+  function bass(pairs) {
+    var list = [];
+    for (var i = 0; i < pairs.length; i++) {
+      for (var j = 0; j < 4; j++) {
+        list.push([pairs[i][0], 2]);
+        list.push([pairs[i][1], 2]);
+      }
+    }
+    return list;
+  }
+
+  function rep(pattern, times) {
+    var s = '';
+    for (var i = 0; i < times; i++) s += pattern;
+    return s;
+  }
+
+  /* ------------------------------------------------------------- 수록곡 */
+
+  // 게임플레이: A단조 행진곡풍 오버월드 테마 (8마디 루프)
+  var GAME_LEAD = [
+    ['A4', 2], ['A4', 2], ['E5', 2], ['A4', 2], ['C5', 2], ['B4', 2], ['A4', 2], ['G4', 2],
+    ['F4', 2], ['F4', 2], ['C5', 2], ['F4', 2], ['A4', 2], ['G4', 2], ['F4', 2], ['E4', 2],
+    ['G4', 2], ['G4', 2], ['D5', 2], ['G4', 2], ['B4', 2], ['A4', 2], ['G4', 2], ['F4', 2],
+    ['E4', 2], ['G4', 2], ['B4', 2], ['E5', 2], ['D5', 4], ['C5', 4],
+    ['A4', 4], ['C5', 2], ['E5', 2], ['A5', 4], ['G5', 2], ['E5', 2],
+    ['F5', 4], ['E5', 2], ['D5', 2], ['C5', 4], ['B4', 2], ['A4', 2],
+    ['G4', 4], ['B4', 2], ['D5', 2], ['G5', 4], ['F5', 2], ['D5', 2],
+    ['E5', 8], [null, 2], ['D5', 2], ['E5', 4]
+  ];
+  var GAME_CHORDS = ['Am', 'F', 'G', 'Em', 'Am', 'F', 'G', 'E'];
+  var GAME_BASS = [
+    ['A2', 'E3'], ['F2', 'C3'], ['G2', 'D3'], ['E2', 'B2'],
+    ['A2', 'E3'], ['F2', 'C3'], ['G2', 'D3'], ['E2', 'B2']
+  ];
+
+  // 타이틀: 느긋하고 웅장한 어드벤처 테마 (8마디 루프)
+  var TITLE_LEAD = [
+    ['A4', 8], ['C5', 4], ['E5', 4],
+    ['A5', 8], ['G5', 4], ['E5', 4],
+    ['F5', 8], ['E5', 4], ['C5', 4],
+    ['D5', 8], ['C5', 4], ['A4', 4],
+    ['G4', 8], ['B4', 4], ['D5', 4],
+    ['G5', 8], ['F5', 4], ['D5', 4],
+    ['E5', 8], ['C5', 4], ['A4', 4],
+    ['B4', 8], ['E5', 8]
+  ];
+  var TITLE_CHORDS = ['Am', 'Am', 'F', 'F', 'G', 'G', 'Am', 'E'];
+  var TITLE_BASS = [
+    ['A2', 'A3'], ['A2', 'E3'], ['F2', 'F3'], ['F2', 'C3'],
+    ['G2', 'G3'], ['G2', 'D3'], ['A2', 'A3'], ['E2', 'B2']
+  ];
+
+  function song(def) {
+    var len = 0;
+    for (var i = 0; i < def.voices.length; i++) {
+      var v = def.voices[i];
+      var n = (v.kind === 'drum') ? v.pat.length : v.seq.length;
+      if (n > len) len = n;
+    }
+    def.len = len;
+    return def;
+  }
+
+  var SONGS = {
+    title: song({
+      bpm: 96, loop: true, dynamic: false,
+      voices: [
+        { kind: 'lead', gain: 0.170, seq: seq(TITLE_LEAD) },
+        { kind: 'harm', gain: 0.055, seq: seq(arp(TITLE_CHORDS, 2)) },
+        { kind: 'bass', gain: 0.200, seq: seq(bass(TITLE_BASS)) },
+        { kind: 'drum', pat: rep('..h...h...h...h.', 8).split('') }
+      ]
+    }),
+
+    game: song({
+      bpm: 120, loop: true, dynamic: true,
+      voices: [
+        { kind: 'lead', gain: 0.160, seq: seq(GAME_LEAD) },
+        { kind: 'harm', gain: 0.050, seq: seq(arp(GAME_CHORDS, 2)) },
+        { kind: 'bass', gain: 0.210, seq: seq(bass(GAME_BASS)) },
+        { kind: 'drum', pat: (rep('K.h.S.h.K.h.S.h.', 7) + 'K.h.S.h.KSKShShS').split('') }
+      ]
+    }),
+
+    win: song({
+      bpm: 150, loop: false, dynamic: false,
+      voices: [
+        { kind: 'lead', gain: 0.20, seq: seq([['C5', 2], ['E5', 2], ['G5', 2], ['C6', 4], [null, 1], ['G5', 1], ['C6', 8]]) },
+        { kind: 'harm', gain: 0.09, seq: seq([['E4', 2], ['G4', 2], ['C5', 2], ['E5', 4], [null, 2], ['E5', 8]]) },
+        { kind: 'bass', gain: 0.22, seq: seq([['C3', 6], ['G2', 6], ['C3', 8]]) }
+      ]
+    }),
+
+    lose: song({
+      bpm: 104, loop: false, dynamic: false,
+      voices: [
+        { kind: 'lead', gain: 0.19, seq: seq([['A4', 3], ['G4', 3], ['F4', 3], ['E4', 5], [null, 2], ['D4', 3], ['A3', 8]]) },
+        { kind: 'bass', gain: 0.22, seq: seq([['A2', 6], ['F2', 6], ['D2', 7], ['A2', 8]]) }
+      ]
+    })
+  };
+
+  /* --------------------------------------------------------- 오디오 엔진 */
+
+  var ctx = null, master = null, noiseBuf = null;
+  var cur = null, stepIdx = 0, nextTime = 0, pending = null;
+  var tempoMul = 1;
+  var paused = false;
+
+  // 배경음악 음량: 0 = Mute, 1 ~ 3 단계
+  var LEVELS = [0, 0.14, 0.26, 0.40];
+  var level = 2;
+  try {
+    var stored = global.localStorage.getItem('snake.bgm');
+    if (stored !== null) level = Math.max(0, Math.min(3, parseInt(stored, 10) || 0));
+    else if (global.localStorage.getItem('snake.muted') === '1') level = 0;   // 예전 설정 이관
+  } catch (e) {}
+
+  function makeNoise() {
+    var len = Math.floor(ctx.sampleRate * 0.4);
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  // 브라우저 자동재생 정책상 사용자 조작 이후에만 소리를 낼 수 있다.
+  function unlock() {
+    if (!ctx) {
+      var AC = global.AudioContext || global.webkitAudioContext;
+      if (!AC) return false;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = LEVELS[level];
+      master.connect(ctx.destination);
+      noiseBuf = makeNoise();
+      global.setInterval(schedule, 25);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    if (pending) { var p = pending; pending = null; play(p); }
+    return true;
+  }
+
+  function tone(kind, t, f, dur, gain) {
+    var o = ctx.createOscillator();
+    o.type = (kind === 'bass') ? 'triangle' : 'square';
+    o.frequency.setValueAtTime(f, t);
+
+    var g = ctx.createGain();
+    var attack = Math.min(0.008, dur * 0.1);
+    var hold = dur * 0.70;
+    var rel = dur * 0.97;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + attack);
+    g.gain.setValueAtTime(gain, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + rel);
+
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+
+  function kick(t) {
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.42, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.16);
+  }
+
+  function noiseHit(t, dur, gain, hp) {
+    var src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    var f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = hp;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.02);
+  }
+
+  // 미리보기 스케줄러: 25ms마다 깨어나 150ms 앞까지 음을 예약한다.
+  function schedule() {
+    if (!cur || !ctx || paused) return;
+    var horizon = ctx.currentTime + 0.15;
+    var guard = 0;
+    while (nextTime < horizon && guard++ < 300) {
+      var mul = cur.dynamic ? tempoMul : 1;
+      var spb = 15 / (cur.bpm * mul);   // 60 / bpm / 4 = 16분음표 한 스텝(초)
+      emit(cur, stepIdx, nextTime, spb);
+      stepIdx++;
+      nextTime += spb;
+      if (stepIdx >= cur.len) {
+        if (cur.loop) stepIdx = 0;
+        else { cur = null; return; }
+      }
+    }
+  }
+
+  function emit(s, i, t, spb) {
+    for (var v = 0; v < s.voices.length; v++) {
+      var voice = s.voices[v];
+      if (voice.kind === 'drum') {
+        var c = voice.pat[i % voice.pat.length];
+        if (c === 'K') kick(t);
+        else if (c === 'S') noiseHit(t, 0.13, 0.20, 1400);
+        else if (c === 'h') noiseHit(t, 0.035, 0.075, 6500);
+      } else {
+        var ev = voice.seq[i];
+        if (ev) tone(voice.kind, t, ev.f, ev.d * spb, voice.gain);
+      }
+    }
+  }
+
+  function play(name) {
+    var s = SONGS[name];
+    if (!s) return;
+    if (!ctx) { pending = name; return; }
+    cur = s;
+    stepIdx = 0;
+    nextTime = ctx.currentTime + 0.06;
+  }
+
+  function stop() { cur = null; pending = null; }
+
+  // 뱀 속도(0 = 시작, 1 = 최고속)에 맞춰 게임 음악 템포를 끌어올린다.
+  function setIntensity(x) {
+    x = Math.max(0, Math.min(1, x || 0));
+    tempoMul = 0.85 + x * 0.9;          // 120bpm 기준 102 ~ 210bpm
+  }
+
+  // 주파수를 훑고 지나가는 짧은 울음소리
+  function chirp(t, f0, f1, dur, gain) {
+    var o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5);
+    o.frequency.exponentialRampToValueAtTime(f0 * 0.8, t + dur);
+
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.01);
+  }
+
+  function sfx(name) {
+    if (!ctx || level === 0 || paused) return;
+    var t = ctx.currentTime + 0.001;
+
+    if (name === 'eat') {
+      tone('lead', t, freq('E5'), 0.055, 0.16);
+      tone('lead', t + 0.055, freq('B5'), 0.075, 0.16);
+
+    } else if (name === 'squeak') {
+      // 쥐가 나타날 때 "찍찍" — 아주 작게
+      chirp(t, 1850, 3250, 0.05, 0.042);
+      chirp(t + 0.082, 2050, 3550, 0.045, 0.036);
+    }
+  }
+
+  function applyGain(ramp) {
+    if (!master) return;
+    master.gain.setTargetAtTime(paused ? 0 : LEVELS[level], ctx.currentTime, ramp);
+  }
+
+  function setLevel(n) {
+    level = Math.max(0, Math.min(LEVELS.length - 1, n | 0));
+    applyGain(0.02);
+    try { global.localStorage.setItem('snake.bgm', String(level)); } catch (e) {}
+    return level;
+  }
+
+  // Mute -> 1 -> 2 -> 3 -> Mute
+  function cycleLevel() { return setLevel((level + 1) % LEVELS.length); }
+
+  // 일시정지: 재생 위치를 유지한 채 스케줄러만 멈춘다.
+  function setPaused(v) {
+    v = !!v;
+    if (v === paused) return;
+    paused = v;
+    applyGain(0.05);
+    if (!paused && ctx) nextTime = ctx.currentTime + 0.06;
+  }
+
+  global.Chip = {
+    unlock: unlock,
+    ready: function () { return !!ctx && ctx.state === 'running'; },
+    play: play,
+    stop: stop,
+    sfx: sfx,
+    setIntensity: setIntensity,
+    tempo: function () { return { mul: tempoMul, bpm: cur ? Math.round(cur.bpm * (cur.dynamic ? tempoMul : 1)) : null }; },
+    isMuted: function () { return level === 0; },
+    level: function () { return level; },
+    maxLevel: LEVELS.length - 1,
+    setLevel: setLevel,
+    cycleLevel: cycleLevel,
+    setPaused: setPaused
+  };
+})(window);
+
+/* =============================================================== 2부 · 게임 */
+
+/*
  * game.js — SNAKE
  *
  * 32 x 18 그리드, 시작 길이 5, 길이 400 달성 시 승리.
@@ -25,6 +401,13 @@
   var POP_MS = 190;       // 새 쥐가 튀어나오는 연출 길이
 
   var FONT = '"Trebuchet MS", "Malgun Gothic", "Segoe UI", sans-serif';
+
+  // 시작 화면 좌하단에 붙는 규칙 요약. 가운데 버튼과 겹치지 않도록 짧게 끊는다.
+  var RULES = [
+    '· 쥐를 먹으면 몸이 길어지고 Mice +1',
+    '· 벽이나 자기 몸에 닿으면 패배',
+    '· 길이 400을 채우면 승리'
+  ];
 
   var DIRS = {
     up:    { x:  0, y: -1 },
@@ -158,10 +541,26 @@
   var shopMiceEl = document.getElementById('shopSilver');
   var shopCloseBtn = document.getElementById('shopClose');
   var skinListEl = document.getElementById('skinList');
+  var stateBadge = document.getElementById('stateBadge');
+  var stateTextEl = document.getElementById('stateText');
+  var pauseBtn = document.getElementById('pauseBtn');
 
   /* ------------------------------------------------------------- 상태 */
 
   var state = 'title';          // title | countdown | playing | paused | win | lose
+
+  /*
+   * 상태 배지에 쓸 문구. 색은 styles.css의 .state-* 가 맡고, 문구는 여기가 맡는다.
+   * 둘을 항상 같이 바꾸므로 색을 구분하지 못해도 문구만으로 상태를 알 수 있다.
+   */
+  var STATE_LABEL = {
+    title:     '대기 중',
+    countdown: '준비!',
+    playing:   '진행 중',
+    paused:    '일시정지',
+    win:       '승리!',
+    lose:      '게임 오버'
+  };
   var snake, dir, queue, food, eaten = 0, earned = 0, nextSeq = 0;
   var moveMs, moveAcc;
   var countdownIdx, countdownAcc;
@@ -695,7 +1094,21 @@
     retryBtn.classList.toggle('hidden', s !== 'lose');
     homeBtn.classList.toggle('hidden', s !== 'win');
     if (s !== 'title') closeShop();
+    renderBadge();
     renderHud();
+  }
+
+  // 색(클래스)과 문구를 한 함수 안에서 같이 갈아끼워, 둘이 어긋날 여지를 없앤다.
+  function renderBadge() {
+    stateBadge.className = 'state-' + state;
+    stateTextEl.textContent = STATE_LABEL[state] || state;
+    // 방향 조작이 의미 있는 상태에서만 방향키를 살린다
+    // 일시정지가 의미 있는 상태에서만 버튼을 살린다
+    var pausable = (state === 'playing' || state === 'paused');
+    pauseBtn.disabled = !pausable;
+    pauseBtn.style.opacity = pausable ? '' : '.35';
+    pauseBtn.textContent = (state === 'paused') ? '▶' : '❚❚';
+    pauseBtn.setAttribute('aria-label', state === 'paused' ? '계속하기' : '일시정지');
   }
 
   function goTitle() {
@@ -804,7 +1217,7 @@
     for (var y = 1; y < ROWS; y++) { ctx.moveTo(0, y * TILE + 0.5); ctx.lineTo(W, y * TILE + 0.5); }
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(57,255,136,0.28)';
+    ctx.strokeStyle = 'rgba(124,179,66,0.24)';
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, W - 2, H - 2);
   }
@@ -838,7 +1251,7 @@
     ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 2;
 
-    ctx.strokeStyle = '#e79cae';
+    ctx.strokeStyle = '#cf94a0';
     ctx.lineWidth = s * 0.055;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -850,7 +1263,7 @@
     ctx.beginPath(); ctx.arc(s * 0.06, -s * 0.17, s * 0.115, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
-    ctx.fillStyle = '#ff9fb2';
+    ctx.fillStyle = '#e0919e';
     ctx.beginPath(); ctx.arc(s * 0.07, -s * 0.16, s * 0.058, 0, Math.PI * 2); ctx.fill();
 
     ctx.shadowColor = 'rgba(20,10,14,0.6)';
@@ -862,7 +1275,7 @@
 
     ctx.fillStyle = '#161b22';
     ctx.beginPath(); ctx.arc(s * 0.20, s * 0.015, s * 0.035, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff6f8b';
+    ctx.fillStyle = '#cf7f8c';
     ctx.beginPath(); ctx.arc(s * 0.335, s * 0.085, s * 0.033, 0, Math.PI * 2); ctx.fill();
 
     ctx.strokeStyle = 'rgba(255,240,245,0.85)';
@@ -881,9 +1294,20 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (glowColor !== 'none') {
-      ctx.shadowColor = glowColor || 'rgba(57,255,136,0.75)';
+      ctx.shadowColor = glowColor || 'rgba(124,179,66,0.45)';
       ctx.shadowBlur = size * 0.5;
     }
+    ctx.fillStyle = color;
+    ctx.fillText(str, x, y);
+    ctx.restore();
+  }
+
+  // 규칙 안내처럼 왼쪽에 붙여 여러 줄을 쌓을 때 쓴다
+  function textLeft(str, x, y, size, color) {
+    ctx.save();
+    ctx.font = size + 'px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = color;
     ctx.fillText(str, x, y);
     ctx.restore();
@@ -918,16 +1342,16 @@
       tokenFont(tokens[i], size);
       w = widths[i];
       if (tokens[i].key) {
-        ctx.fillStyle = 'rgba(6,20,12,0.65)';
-        ctx.strokeStyle = 'rgba(57,255,136,0.45)';
+        ctx.fillStyle = 'rgba(16,28,18,0.7)';
+        ctx.strokeStyle = 'rgba(124,179,66,0.42)';
         ctx.lineWidth = 1.5;
         rrectOn(ctx, x, y - badgeH / 2, w, badgeH, size * 0.32);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = 'rgba(215,255,232,0.94)';
+        ctx.fillStyle = 'rgba(226,238,214,0.94)';
         ctx.fillText(tokens[i].key, x + w / 2, y + 1);
       } else {
-        ctx.fillStyle = 'rgba(210,255,230,0.62)';
+        ctx.fillStyle = 'rgba(206,224,196,0.6)';
         ctx.fillText(tokens[i].text, x + w / 2, y + 1);
       }
       x += w + gap;
@@ -973,7 +1397,7 @@
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.shadowBlur = blur || 0;
-      ctx.shadowColor = blur ? 'rgba(57,255,136,0.85)' : 'transparent';
+      ctx.shadowColor = blur ? 'rgba(124,179,66,0.5)' : 'transparent';
       ctx.setLineDash(dash || []);
       ctx.beginPath();
       for (var k = 0; k < strokes.length; k++) {
@@ -985,29 +1409,29 @@
       ctx.setLineDash([]);
     }
 
-    strokeAll('#04160c', w + 10, 0);
-    strokeAll('#0f7f4a', w + 4, 0);
-    strokeAll('#39ff88', w, 22);
-    strokeAll('rgba(205,255,195,0.45)', w * 0.34, 0, [s * 0.34, s * 0.5]);
+    strokeAll('#0d1a0d', w + 10, 0);
+    strokeAll('#3f6b2e', w + 4, 0);
+    strokeAll('#7cb342', w, 14);
+    strokeAll('rgba(214,232,180,0.38)', w * 0.34, 0, [s * 0.34, s * 0.5]);
 
     var head = strokes[0][0];
     var hx = head[0] + s * 0.18, hy = head[1] - s * 0.20;
 
-    ctx.shadowColor = 'rgba(57,255,136,0.9)';
+    ctx.shadowColor = 'rgba(124,179,66,0.5)';
     ctx.shadowBlur = 24;
-    ctx.fillStyle = '#b9ff5a';
+    ctx.fillStyle = '#a8cc6a';
     ctx.beginPath();
     ctx.ellipse(hx, hy, w * 0.80, w * 0.66, -0.55, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#06130a';
+    ctx.fillStyle = '#111c0e';
     ctx.beginPath(); ctx.arc(hx + s * 0.26, hy - s * 0.22, w * 0.15, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(hx - s * 0.06, hy - s * 0.34, w * 0.13, 0, Math.PI * 2); ctx.fill();
 
     var flick = (Math.sin(now / 240) > 0.72) ? 1 : 0.4;
     var tx = hx + s * 0.62, ty = hy - s * 0.46;
-    ctx.strokeStyle = '#ff4d6d';
+    ctx.strokeStyle = '#c4553f';
     ctx.lineWidth = Math.max(2, s * 0.09);
     ctx.beginPath();
     ctx.moveTo(hx + s * 0.34, hy - s * 0.22);
@@ -1022,8 +1446,8 @@
 
     ctx.translate(tp[0], tp[1]);
     ctx.rotate(ang);
-    ctx.fillStyle = '#0f9d58';
-    ctx.shadowColor = 'rgba(57,255,136,0.7)';
+    ctx.fillStyle = '#5c8a3f';
+    ctx.shadowColor = 'rgba(124,179,66,0.42)';
     ctx.shadowBlur = 14;
     ctx.beginPath();
     ctx.moveTo(0, -w * 0.5);
@@ -1038,7 +1462,7 @@
   /* --------------------------------------------------------- draw() */
 
   function veil(a) {
-    ctx.fillStyle = 'rgba(6,10,7,' + a + ')';
+    ctx.fillStyle = 'rgba(10,16,11,' + a + ')';
     ctx.fillRect(0, 0, W, H);
   }
 
@@ -1063,10 +1487,10 @@
       ctx.font = 'bold 15px ' + FONT;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'rgba(220,255,235,0.85)';
+      ctx.fillStyle = 'rgba(226,238,214,0.85)';
       ctx.fillText(sk.ko, 14, yc - 10);
       ctx.font = 'italic 12px ' + FONT;
-      ctx.fillStyle = 'rgba(200,255,225,0.45)';
+      ctx.fillStyle = 'rgba(206,224,196,0.45)';
       ctx.fillText(sk.sci, 14, yc + 8);
       ctx.restore();
     }
@@ -1080,17 +1504,26 @@
     if (state === 'title') {
       drawSnake(wander.cells, 0.5, wander.dir);
       veil(0.5);
-      drawLogo(W / 2, H * 0.30, 27);
+      drawLogo(W / 2, H * 0.26, 27);
 
-      drawKeys(W / 2, H * 0.565, [
+      drawKeys(W / 2, H * 0.47, [
         { key: 'W' }, { key: 'A' }, { key: 'S' }, { key: 'D' }, { text: '/' },
         { key: '←' }, { key: '↑' }, { key: '↓' }, { key: '→' }, { text: '  이동' }
-      ], 19);
+      ], 18);
 
-      drawKeys(W / 2, H * 0.675, [
+      drawKeys(W / 2, H * 0.565, [
+        { text: '모바일 환경: 이동 방향으로 스와이프' }
+      ], 18);
+
+      drawKeys(W / 2, H * 0.66, [
         { key: 'ESC' }, { text: '  일시정지' }, { text: '  ' },
         { key: 'M' }, { text: '  배경음악 음량 (Mute · 1 · 2 · 3)' }
-      ], 19);
+      ], 18);
+
+      // 규칙은 좌하단에 붙인다 — 가운데는 시작/상점 버튼 자리다
+      RULES.forEach(function (line, i) {
+        textLeft(line, W * 0.036, H * (0.775 + i * 0.065), 14, 'rgba(206, 224, 196, 0.5)');
+      });
 
     } else {
       if (food) drawMouse(food);
@@ -1101,34 +1534,34 @@
         var label = COUNTDOWN[Math.min(countdownIdx, COUNTDOWN.length - 1)];
         var p = countdownAcc / COUNT_MS;
         text(label, W / 2, H * 0.45, 150 - p * 28,
-             label === 'Go!' ? '#b9ff5a' : '#e8fff3');
+             label === 'Go!' ? '#a8cc6a' : '#e7efe1');
 
       } else if (state === 'paused') {
         veil(0.68);
-        text('PAUSED', W / 2, H * 0.42, 86, '#e8fff3');
+        text('PAUSED', W / 2, H * 0.42, 86, '#e7efe1');
         drawKeys(W / 2, H * 0.58, [{ key: 'ESC' }, { text: '  를 눌러 계속' }], 22);
 
       } else if (state === 'win') {
         veil(0.72);
-        text('You Win!', W / 2, H * 0.32, 96, '#b9ff5a');
+        text('You Win!', W / 2, H * 0.32, 96, '#a8cc6a');
         text('SCORE ' + snake.length, W / 2, H * 0.455, 30,
-             'rgba(210,255,230,0.85)', 'none');
+             'rgba(214,228,200,0.85)', 'none');
         text('Mice +' + earned, W / 2, H * 0.545, 22,
-             'rgba(255,222,150,0.85)', 'none');
+             'rgba(207,161,78,0.92)', 'none');
 
       } else if (state === 'lose') {
         veil(0.72);
-        text('Better Luck Next Time', W / 2, H * 0.32, 60, '#ff6b81',
-             'rgba(255,59,92,0.75)');
+        text('Better Luck Next Time', W / 2, H * 0.32, 60, '#c4553f',
+             'rgba(196,85,63,0.55)');
         text('SCORE ' + snake.length + '   ·   승리까지 ' + Math.max(0, WIN_LEN - snake.length) + ' 남았습니다',
-             W / 2, H * 0.455, 24, 'rgba(255,215,222,0.8)', 'none');
+             W / 2, H * 0.455, 24, 'rgba(226,200,190,0.8)', 'none');
         text('Mice +' + earned, W / 2, H * 0.545, 22,
-             'rgba(255,222,150,0.85)', 'none');
+             'rgba(207,161,78,0.92)', 'none');
       }
     }
 
     if (flash > 0) {
-      ctx.fillStyle = 'rgba(230,255,200,' + (flash * 0.09) + ')';
+      ctx.fillStyle = 'rgba(216,232,186,' + (flash * 0.09) + ')';
       ctx.fillRect(0, 0, W, H);
     }
   }
@@ -1295,6 +1728,21 @@
     win();
   }
 
+  /* ------------------------------------------------------------ 입력 */
+
+  /*
+   * 방향 입력의 단일 창구. 키보드와 터치가 같은 규칙을 타도록 한 곳에 모았다.
+   * 진행 방향의 정반대 입력은 자기 목을 무는 즉사로 이어지므로 버린다.
+   */
+  function turn(d) {
+    if (state !== 'playing') return false;
+    var lastDir = queue.length ? queue[queue.length - 1] : dir;
+    if (d === lastDir || d === OPP[lastDir]) return false;
+    if (queue.length >= 2) return false;
+    queue.push(d);
+    return true;
+  }
+
   window.addEventListener('keydown', function (e) {
     wake();
 
@@ -1315,6 +1763,10 @@
     if (state === 'playing' && e.key === '`') { debugGrow(50); return; }
 
     if (e.key === ' ' || e.key === 'Enter') {
+      // 버튼에 초점이 있으면 브라우저가 이미 click을 쏜다. 여기서 또 처리하면
+      // 같은 입력이 두 번 먹으므로 비켜준다.
+      var focused = document.activeElement;
+      if (focused && focused.tagName === 'BUTTON') return;
       if (state === 'title') { e.preventDefault(); startGame(); return; }
       if (state === 'win' || state === 'lose') { e.preventDefault(); goTitle(); return; }
     }
@@ -1322,12 +1774,7 @@
     var d = KEYMAP[e.key];
     if (!d) return;
     e.preventDefault();
-    if (state !== 'playing') return;
-
-    // 진행 방향의 정반대 입력은 즉사로 이어지므로 무시한다.
-    var lastDir = queue.length ? queue[queue.length - 1] : dir;
-    if (d === lastDir || d === OPP[lastDir]) return;
-    if (queue.length < 2) queue.push(d);
+    turn(d);
   });
 
   window.addEventListener('pointerdown', wake);
@@ -1338,6 +1785,62 @@
   retryBtn.addEventListener('click', function () { wake(); goTitle(); });
   homeBtn.addEventListener('click', function () { wake(); goTitle(); });
   muteBtn.addEventListener('click', function () { wake(); cycleBgm(); });
+
+  pauseBtn.addEventListener('click', function () { wake(); togglePause(); });
+
+  /* ------------------------------------------------------ 스와이프 */
+
+  /*
+   * 모바일 조작은 전부 스와이프다. D패드는 가로모드에서 캔버스가 쓸 수 있는
+   * 폭을 그대로 잡아먹어 걷어냈다.
+   *
+   * pointerup이 아니라 pointermove 도중 24px을 넘기는 순간 방향을 받는다.
+   * 손가락을 떼야 반응하면 다음 이동 타이밍을 놓치기 쉽기 때문이다.
+   * 받은 방향은 turn()이 큐에 넣고, 뱀은 다음 이동 시점에 그 방향으로 꺾인다.
+   * 기준점을 그 자리로 옮겨두므로, 손가락을 떼지 않고 이어서 밀면
+   * 한 번의 제스처 안에서 두 번째 방향까지 넣을 수 있다.
+   */
+  var SWIPE_MIN = 24;
+  var swipe = null;
+
+  canvas.addEventListener('pointerdown', function (e) {
+    swipe = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+
+  canvas.addEventListener('pointermove', function (e) {
+    if (!swipe || e.pointerId !== swipe.id) return;
+
+    var dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) return;
+
+    // 더 많이 움직인 축만 남긴다 — 대각선을 두 방향으로 읽지 않기 위해서다
+    turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left')
+                                     : (dy > 0 ? 'down' : 'up'));
+
+    swipe.x = e.clientX;
+    swipe.y = e.clientY;
+  });
+
+  function endSwipe() { swipe = null; }
+  canvas.addEventListener('pointerup', endSwipe);
+  canvas.addEventListener('pointercancel', endSwipe);
+  canvas.addEventListener('pointerleave', endSwipe);
+
+  /* --------------------------------------------------- 키보드 초점 */
+
+  /*
+   * TAB을 한 번이라도 누르기 전에는 초점 테두리를 그리지 않는다.
+   * 눌린 뒤부터는 body.kbd가 붙어 CSS가 호박색 테두리를 그린다.
+   * 다시 포인터를 쓰면 떼어내, 마우스 사용자에게는 테두리가 남지 않는다.
+   */
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Tab') document.body.classList.add('kbd');
+  }, true);
+
+  window.addEventListener('pointerdown', function () {
+    document.body.classList.remove('kbd');
+  }, true);
+
 
   /* ------------------------------------------------------------- 기동 */
 
